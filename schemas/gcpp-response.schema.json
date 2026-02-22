@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rolasotelo/goodcommit/blob/main/schemas/gcpp-response.schema.json",
+  "title": "Goodcommit Plugin Response v1",
+  "type": "object",
+  "required": ["request_id", "ok", "diagnostics"],
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "ok": { "type": "boolean" },
+    "fatal": { "type": "boolean", "default": false },
+    "block_commit": { "type": "boolean", "default": false },
+    "block_reason": { "type": "string" },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["level", "message"],
+        "properties": {
+          "level": { "type": "string", "enum": ["info", "warn", "error"] },
+          "message": { "type": "string" },
+          "code": { "type": "string" },
+          "path": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "mutations": {
+      "type": "object",
+      "properties": {
+        "set_title": { "type": "string" },
+        "set_body": { "type": "string" },
+        "append_body": { "type": "string" },
+        "prepend_body": { "type": "string" },
+        "add_trailers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "value"],
+            "properties": {
+              "key": { "type": "string" },
+              "value": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "metadata_patch": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "prompt_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "title"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["input", "confirm", "select", "multiselect"]
+          },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "required": { "type": "boolean", "default": false },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label", "value"],
+              "properties": {
+                "label": { "type": "string" },
+                "value": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ui_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "fields"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "submit_label": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "type", "title"],
+              "properties": {
+                "id": { "type": "string" },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "note",
+                    "input",
+                    "text",
+                    "confirm",
+                    "select",
+                    "multiselect"
+                  ]
+                },
+                "title": { "type": "string" },
+                "description": { "type": "string" },
+                "required": { "type": "boolean", "default": false },
+                "char_limit": { "type": "integer", "minimum": 1 },
+                "placeholder": { "type": "string" },
+                "value": { "type": "string" },
+                "editor": { "type": "boolean", "default": false },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["label", "value"],
+                    "properties": {
+                      "label": { "type": "string" },
+                      "value": { "type": "string" }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

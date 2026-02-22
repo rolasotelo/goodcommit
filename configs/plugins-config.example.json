@@ -1,0 +1,14 @@
+{
+  "plugins": [
+    {
+      "id": "builtin/types",
+      "enabled": true,
+      "manifest": "./plugins/types.manifest.json",
+      "source": { "type": "path", "path": "./cmd/goodcommit-plugin-types" },
+      "order": 1,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "config": { "path": "./configs/commit-types.json" }
+    }
+  ]
+}

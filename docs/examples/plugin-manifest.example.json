@@ -1,0 +1,49 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "community/title-regex",
+  "name": "Commit Title Regex Validator",
+  "version": "1.2.0",
+  "description": "Validates commit title against an organization rule.",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {
+    "type": "exec",
+    "command": "goodcommit-plugin-title-regex",
+    "args": ["serve-json"]
+  },
+  "hooks": ["validate"],
+  "permissions": {
+    "network": false,
+    "git_read": true,
+    "git_write": false,
+    "filesystem_read": [],
+    "filesystem_write": [],
+    "secrets": []
+  },
+  "ai_hints": {
+    "purpose": "Enforce title format quality gate.",
+    "instructions": "No answer values expected. Ensure generated title follows conventional format."
+  },
+  "contract": {
+    "metadata_reads": [
+      {
+        "key": "gc.type",
+        "description": "Type contributes to generated title."
+      }
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "required": ["pattern"],
+    "properties": {
+      "pattern": {
+        "type": "string",
+        "description": "Regular expression used to validate title."
+      },
+      "error_message": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  }
+}

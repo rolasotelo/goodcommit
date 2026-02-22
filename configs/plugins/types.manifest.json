@@ -1,0 +1,33 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/types",
+  "name": "Types",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {
+    "type": "exec",
+    "command": "go",
+    "args": ["run", "./cmd/goodcommit-plugin-types"]
+  },
+  "hooks": ["collect"],
+  "permissions": { "network": false, "git_read": false, "git_write": false },
+  "contract": {
+    "answers": [
+      {
+        "key": "commit_type",
+        "description": "Conventional commit type id.",
+        "type": "string",
+        "required": true,
+        "strategy": "infer_from_diff"
+      }
+    ],
+    "metadata_writes": [
+      { "key": "gc.type", "description": "Selected commit type id." }
+    ]
+  },
+  "ai_hints": {
+    "purpose": "Select conventional commit type.",
+    "instructions": "Infer commit_type from staged diff intent. Prefer feat/fix/chore/docs/refactor patterns."
+  }
+}
