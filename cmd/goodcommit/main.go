@@ -9,21 +9,65 @@ Usage:
 	goodcommit plugin context [flags]
 
 Flags:
+
+	--accessible           Enable accessible mode for forms
+	--message              Use an initial commit message before plugin phases
+	--plugins-config       Path to a plugin configuration file
+	--plugins-lockfile     Path to a plugin lockfile (default: goodcommit.plugins.lock)
+	--plugins-skip-verify  Skip plugin lockfile verification
+	--plugin-answer        Provide answer for plugin prompts/forms as key=value (repeatable)
+	--retry                Retry commit with the last saved commit message
+	--edit                 Edit the last saved commit message
+	-m                     Dry run mode, do not execute commit
+	-h                     Show this help message
 */
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/charmbracelet/huh"
 	plugins "github.com/rolasotelo/goodcommit/internal/pluginruntime"
+	"golang.org/x/term"
 )
 
+type pluginAnswerFlag map[string]string
+
+func (f *pluginAnswerFlag) String() string {
+	if f == nil {
+		return ""
+	}
+	parts := make([]string, 0, len(*f))
+	for k, v := range *f {
+		parts = append(parts, k+"="+v)
+	}
+	return strings.Join(parts, ",")
+}
+
+func (f *pluginAnswerFlag) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+		return fmt.Errorf("invalid --plugin-answer value %q, expected key=value", value)
+	}
+	if *f == nil {
+		*f = map[string]string{}
+	}
+	(*f)[strings.TrimSpace(parts[0])] = parts[1]
+	return nil
+}
+
 func main() {
-	fmt.Println("hello world")
 	if len(os.Args) > 1 && os.Args[1] == "plugin" {
 		if err := runPluginSubcommand(os.Args[2:]); err != nil {
 			fmt.Println("Error:", err)
@@ -31,6 +75,531 @@ func main() {
 		}
 		return
 	}
+
+	pluginsConfigPath := os.Getenv("GOODCOMMIT_PLUGINS_CONFIG_PATH")
+	if pluginsConfigPath == "" {
+		pluginsConfigPath = "./configs/goodcommit.plugins.json"
+	}
+	flag.StringVar(&pluginsConfigPath, "plugins-config", pluginsConfigPath, "Path to a plugin configuration file")
+
+	pluginsLockfilePath := os.Getenv("GOODCOMMIT_PLUGINS_LOCKFILE")
+	if pluginsLockfilePath == "" {
+		pluginsLockfilePath = "goodcommit.plugins.lock"
+	}
+	flag.StringVar(&pluginsLockfilePath, "plugins-lockfile", pluginsLockfilePath, "Path to a plugin lockfile")
+
+	pluginsSkipVerify := flag.Bool("plugins-skip-verify", false, "Skip plugin lockfile verification")
+	messageOverride := flag.String("message", "", "Use an initial commit message before plugin phases")
+	var pluginAnswers pluginAnswerFlag
+	flag.Var(&pluginAnswers, "plugin-answer", "Provide answer for plugin prompts/forms as key=value (repeatable)")
+
+	accessible, _ := strconv.ParseBool(os.Getenv("ACCESSIBLE"))
+	flag.BoolVar(&accessible, "accessible", accessible, "Enable accessible mode")
+
+	dryRun := flag.Bool("m", false, "Dry run mode, do not execute commit")
+	retry := flag.Bool("retry", false, "Retry commit with the last saved commit message")
+	help := flag.Bool("h", false, "Show this help message")
+	edit := flag.Bool("edit", false, "Edit the last saved commit message")
+	flag.Parse()
+
+	if *help {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if *edit {
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+		cmd := exec.Command(editor, ".goodcommit_msg.tmp")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Error opening editor: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Commit message edited, now run 'goodcommit --retry' to commit.")
+		os.Exit(0)
+	}
+
+	if *retry && *dryRun {
+		fmt.Println("Error: -m and --retry cannot be used together.")
+		os.Exit(1)
+	}
+
+	if *retry {
+		messageBytes, err := os.ReadFile(".goodcommit_msg.tmp")
+		if err != nil {
+			fmt.Printf("Error reading saved commit message: %s\n", err)
+			os.Exit(1)
+		}
+		message := string(messageBytes)
+
+		var confirm bool
+		err = huh.NewConfirm().Title("Commit with the following message?").Description(message).Value(&confirm).Run()
+		if err != nil {
+			fmt.Printf("Error during confirmation: %s\n", err)
+			os.Exit(1)
+		}
+		if !confirm {
+			fmt.Println("Commit canceled.")
+			os.Exit(0)
+		}
+
+		if err := runGitCommit(message); err != nil {
+			fmt.Printf("Error executing commit command: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Commit successful with the last saved commit message.")
+		if err := os.Remove(".goodcommit_msg.tmp"); err != nil {
+			fmt.Printf("Error removing temporary file: %s\n", err)
+		}
+		os.Exit(0)
+	}
+
+	resolvedPlugins, err := plugins.LoadResolvedPlugins(pluginsConfigPath)
+	if err != nil {
+		fmt.Println("Error loading plugins config:", err)
+		os.Exit(1)
+	}
+	if !*pluginsSkipVerify {
+		if err := plugins.VerifyResolvedPlugins(resolvedPlugins, pluginsLockfilePath); err != nil {
+			fmt.Printf("Plugin lockfile verification failed (%s): %v\n", pluginsLockfilePath, err)
+			fmt.Println("Run: goodcommit plugin lock --plugins-config <path> --plugins-lockfile <path>")
+			os.Exit(1)
+		}
+	}
+	runtimePlugins := plugins.RuntimePlugins(resolvedPlugins)
+	autoAnswersByPlugin := buildAutoAnswersByPlugin(runtimePlugins)
+
+	draft := plugins.CommitDraft{Metadata: map[string]interface{}{}}
+	if *messageOverride != "" {
+		draft = draftFromMessage(*messageOverride)
+	}
+
+	reqCtx := gatherRequestContext()
+	runner := plugins.NewRunner()
+	runner.PromptHandler = makePromptResolver(pluginAnswers, autoAnswersByPlugin, accessible)
+	runner.UIHandler = makeUIResolver(pluginAnswers, autoAnswersByPlugin, accessible)
+
+	invocations, err := runPluginPhases(context.Background(), runner, runtimePlugins, reqCtx, &draft, []plugins.HookPhase{
+		plugins.HookCollect,
+		plugins.HookValidate,
+		plugins.HookEnrich,
+		plugins.HookFinalize,
+		plugins.HookPreCommit,
+	})
+	printPluginInvocations(invocations)
+	if err != nil {
+		fmt.Println("Plugin execution failed:", err)
+		os.Exit(1)
+	}
+
+	message := renderDraft(draft)
+	if *dryRun {
+		fmt.Println("Dry run mode, commit not executed.")
+		fmt.Println("Final commit message:")
+		fmt.Println(message)
+		return
+	}
+
+	if err := runGitCommit(message); err != nil {
+		errSave := os.WriteFile(".goodcommit_msg.tmp", []byte(message), 0o644)
+		if errSave != nil {
+			fmt.Printf("Error saving commit message ('goodcommit --retry' won't work): %s\n", errSave)
+		}
+		fmt.Printf("Error executing command: %s\n", err)
+		os.Exit(1)
+	}
+
+	postInvocations, postErr := runPluginPhases(context.Background(), runner, runtimePlugins, reqCtx, &draft, []plugins.HookPhase{plugins.HookPostCommit})
+	printPluginInvocations(postInvocations)
+	if postErr != nil {
+		fmt.Println("Post-commit plugin execution failed:", postErr)
+	}
+}
+
+func runPluginPhases(ctx context.Context, runner *plugins.Runner, runtimePlugins []plugins.RuntimePlugin, reqCtx plugins.RequestContext, draft *plugins.CommitDraft, phases []plugins.HookPhase) ([]plugins.Invocation, error) {
+	all := []plugins.Invocation{}
+	for _, phase := range phases {
+		invocations, err := runner.RunPhase(ctx, phase, draft, reqCtx, runtimePlugins)
+		all = append(all, invocations...)
+		if err != nil {
+			return all, err
+		}
+		for _, inv := range invocations {
+			if inv.Response.BlockCommit {
+				reason := inv.Response.BlockReason
+				if reason == "" {
+					reason = "blocked by plugin"
+				}
+				return all, fmt.Errorf("commit blocked by %s: %s", inv.PluginID, reason)
+			}
+			if inv.Response.Fatal {
+				return all, fmt.Errorf("fatal plugin response from %s", inv.PluginID)
+			}
+		}
+	}
+	return all, nil
+}
+
+func printPluginInvocations(invocations []plugins.Invocation) {
+	for _, inv := range invocations {
+		for _, d := range inv.Response.Diagnostics {
+			fmt.Printf("[plugin:%s][%s][%s] %s\n", inv.PluginID, inv.Hook, d.Level, d.Message)
+		}
+		if inv.Stderr != "" {
+			fmt.Printf("[plugin:%s][stderr] %s\n", inv.PluginID, strings.TrimSpace(inv.Stderr))
+		}
+	}
+}
+
+func makePromptResolver(predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) plugins.PromptHandler {
+	return func(pluginID string, promptRequests []plugins.PromptRequest) (map[string]interface{}, error) {
+		return resolvePromptRequests(pluginID, promptRequests, predefined, autoByPlugin, accessible)
+	}
+}
+
+func makeUIResolver(predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) plugins.UIHandler {
+	return func(pluginID string, forms []plugins.UIRequest) (map[string]interface{}, error) {
+		return resolveUIRequests(pluginID, forms, predefined, autoByPlugin, accessible)
+	}
+}
+
+func renderDraft(d plugins.CommitDraft) string {
+	var b strings.Builder
+	b.WriteString(strings.TrimSpace(d.Title))
+	if d.Body != "" {
+		b.WriteString("\n\n")
+		b.WriteString(strings.TrimRight(d.Body, "\n"))
+	}
+	if len(d.Trailers) > 0 {
+		b.WriteString("\n\n")
+		for i, t := range d.Trailers {
+			if i > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(strings.TrimSpace(t.Key))
+			b.WriteString(": ")
+			b.WriteString(strings.TrimSpace(t.Value))
+		}
+	}
+	b.WriteByte('\n')
+	return b.String()
+}
+
+func resolveUIRequests(pluginID string, forms []plugins.UIRequest, predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) (map[string]interface{}, error) {
+	answers := map[string]interface{}{}
+	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+
+	for _, ui := range forms {
+		if !isTTY {
+			for _, f := range ui.Fields {
+				if f.Type == "note" {
+					continue
+				}
+				raw, ok := findPredefined(predefined, ui.ID, f.ID)
+				if !ok {
+					if autoVal, found := findAutoAnswer(autoByPlugin, pluginID, ui.ID, f.ID); found {
+						answers[f.ID] = autoVal
+						continue
+					}
+					if f.Required {
+						return nil, fmt.Errorf("form field %s.%s requires TTY (or pass --plugin-answer %s.%s=...)", ui.ID, f.ID, ui.ID, f.ID)
+					}
+					continue
+				}
+				value, err := parsePredefinedAnswer(raw, f.Type)
+				if err != nil {
+					return nil, fmt.Errorf("plugin %s field %s.%s invalid predefined answer: %w", pluginID, ui.ID, f.ID, err)
+				}
+				answers[f.ID] = value
+			}
+			answers[ui.ID+".__submitted"] = true
+			continue
+		}
+
+		var fields []huh.Field
+		local := map[string]interface{}{}
+		for _, f := range ui.Fields {
+			switch f.Type {
+			case "note":
+				fields = append(fields, huh.NewNote().Title(f.Title).Description(f.Description))
+			case "input":
+				v := f.Value
+				input := huh.NewInput().Title(f.Title).Description(f.Description).Placeholder(f.Placeholder).Value(&v)
+				if f.CharLimit > 0 {
+					input = input.CharLimit(f.CharLimit)
+				}
+				if f.Required {
+					input = input.Validate(func(s string) error {
+						if strings.TrimSpace(s) == "" {
+							return fmt.Errorf("value is required")
+						}
+						return nil
+					})
+				}
+				fields = append(fields, input)
+				local[f.ID] = &v
+			case "text":
+				v := f.Value
+				text := huh.NewText().Title(f.Title).Description(f.Description).Placeholder(f.Placeholder).Value(&v)
+				if f.Editor {
+					text = text.Editor("vim")
+				}
+				fields = append(fields, text)
+				local[f.ID] = &v
+			case "confirm":
+				var v bool
+				fields = append(fields, huh.NewConfirm().Title(f.Title).Description(f.Description).Value(&v))
+				local[f.ID] = &v
+			case "select":
+				opts := make([]huh.Option[string], 0, len(f.Options))
+				for _, o := range f.Options {
+					opts = append(opts, huh.NewOption(o.Label, o.Value))
+				}
+				v := ""
+				fields = append(fields, huh.NewSelect[string]().Title(f.Title).Description(f.Description).Options(opts...).Value(&v))
+				local[f.ID] = &v
+			case "multiselect":
+				opts := make([]huh.Option[string], 0, len(f.Options))
+				for _, o := range f.Options {
+					opts = append(opts, huh.NewOption(o.Label, o.Value))
+				}
+				v := []string{}
+				fields = append(fields, huh.NewMultiSelect[string]().Title(f.Title).Description(f.Description).Options(opts...).Value(&v))
+				local[f.ID] = &v
+			default:
+				return nil, fmt.Errorf("plugin %s field %s.%s has unsupported type %q", pluginID, ui.ID, f.ID, f.Type)
+			}
+		}
+		form := huh.NewForm(huh.NewGroup(fields...)).WithAccessible(accessible)
+		if err := form.Run(); err != nil {
+			return nil, fmt.Errorf("plugin %s form %s failed: %w", pluginID, ui.ID, err)
+		}
+		for id, ref := range local {
+			switch x := ref.(type) {
+			case *string:
+				answers[id] = *x
+			case *bool:
+				answers[id] = *x
+			case *[]string:
+				answers[id] = *x
+			}
+		}
+		answers[ui.ID+".__submitted"] = true
+	}
+
+	return answers, nil
+}
+
+func resolvePromptRequests(pluginID string, promptRequests []plugins.PromptRequest, predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) (map[string]interface{}, error) {
+	answers := map[string]interface{}{}
+	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+	for _, p := range promptRequests {
+		if predefined != nil {
+			if raw, ok := predefined[p.ID]; ok {
+				value, err := parsePredefinedAnswer(raw, p.Type)
+				if err != nil {
+					return nil, fmt.Errorf("plugin %s prompt %s invalid predefined answer: %w", pluginID, p.ID, err)
+				}
+				answers[p.ID] = value
+				continue
+			}
+		}
+		if autoVal, ok := findAutoAnswer(autoByPlugin, pluginID, "", p.ID); ok {
+			answers[p.ID] = autoVal
+			continue
+		}
+		if !isTTY {
+			return nil, fmt.Errorf("prompt %s requires TTY (or pass --plugin-answer %s=...)", p.ID, p.ID)
+		}
+		switch p.Type {
+		case "input":
+			var value string
+			field := huh.NewInput().Title(p.Title).Description(p.Description).Value(&value)
+			if p.Required {
+				field = field.Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("value is required")
+					}
+					return nil
+				})
+			}
+			form := huh.NewForm(huh.NewGroup(field)).WithAccessible(accessible)
+			if err := form.Run(); err != nil {
+				return nil, fmt.Errorf("plugin %s prompt %s failed: %w", pluginID, p.ID, err)
+			}
+			answers[p.ID] = value
+		case "confirm":
+			var value bool
+			form := huh.NewForm(huh.NewGroup(huh.NewConfirm().Title(p.Title).Description(p.Description).Value(&value))).WithAccessible(accessible)
+			if err := form.Run(); err != nil {
+				return nil, fmt.Errorf("plugin %s prompt %s failed: %w", pluginID, p.ID, err)
+			}
+			answers[p.ID] = value
+		case "select":
+			if len(p.Options) == 0 {
+				return nil, fmt.Errorf("plugin %s prompt %s has no options", pluginID, p.ID)
+			}
+			opts := make([]huh.Option[string], 0, len(p.Options))
+			for _, o := range p.Options {
+				opts = append(opts, huh.NewOption(o.Label, o.Value))
+			}
+			var value string
+			form := huh.NewForm(huh.NewGroup(huh.NewSelect[string]().Title(p.Title).Description(p.Description).Options(opts...).Value(&value))).WithAccessible(accessible)
+			if err := form.Run(); err != nil {
+				return nil, fmt.Errorf("plugin %s prompt %s failed: %w", pluginID, p.ID, err)
+			}
+			answers[p.ID] = value
+		case "multiselect":
+			if len(p.Options) == 0 {
+				return nil, fmt.Errorf("plugin %s prompt %s has no options", pluginID, p.ID)
+			}
+			opts := make([]huh.Option[string], 0, len(p.Options))
+			for _, o := range p.Options {
+				opts = append(opts, huh.NewOption(o.Label, o.Value))
+			}
+			var value []string
+			form := huh.NewForm(huh.NewGroup(huh.NewMultiSelect[string]().Title(p.Title).Description(p.Description).Options(opts...).Value(&value))).WithAccessible(accessible)
+			if err := form.Run(); err != nil {
+				return nil, fmt.Errorf("plugin %s prompt %s failed: %w", pluginID, p.ID, err)
+			}
+			answers[p.ID] = value
+		default:
+			return nil, fmt.Errorf("plugin %s prompt %s has unsupported type %q", pluginID, p.ID, p.Type)
+		}
+	}
+	return answers, nil
+}
+
+func findAutoAnswer(autoByPlugin map[string]map[string]interface{}, pluginID, formID, fieldID string) (interface{}, bool) {
+	if autoByPlugin == nil {
+		return nil, false
+	}
+	answers, ok := autoByPlugin[pluginID]
+	if !ok || answers == nil {
+		return nil, false
+	}
+	if formID != "" {
+		if v, ok := answers[formID+"."+fieldID]; ok {
+			return v, true
+		}
+	}
+	v, ok := answers[fieldID]
+	return v, ok
+}
+
+var trailerLineRe = regexp.MustCompile(`^[A-Za-z0-9-]+:\s+.+$`)
+
+func draftFromMessage(message string) plugins.CommitDraft {
+	msg := strings.ReplaceAll(message, "\r\n", "\n")
+	msg = strings.TrimRight(msg, "\n")
+	parts := strings.SplitN(msg, "\n", 2)
+	title := ""
+	rest := ""
+	if len(parts) > 0 {
+		title = parts[0]
+	}
+	if len(parts) == 2 {
+		rest = strings.TrimLeft(parts[1], "\n")
+	}
+
+	body := rest
+	trailers := []plugins.Trailer{}
+	if rest != "" {
+		lines := strings.Split(rest, "\n")
+		i := len(lines) - 1
+		for i >= 0 && strings.TrimSpace(lines[i]) == "" {
+			i--
+		}
+		start := i
+		for start >= 0 && trailerLineRe.MatchString(lines[start]) {
+			start--
+		}
+		start++
+		if start <= i && start >= 0 {
+			for _, tl := range lines[start : i+1] {
+				kv := strings.SplitN(tl, ":", 2)
+				if len(kv) == 2 {
+					trailers = append(trailers, plugins.Trailer{Key: strings.TrimSpace(kv[0]), Value: strings.TrimSpace(kv[1])})
+				}
+			}
+			body = strings.TrimRight(strings.Join(lines[:start], "\n"), "\n")
+		}
+	}
+
+	return plugins.CommitDraft{Title: title, Body: body, Trailers: trailers, Metadata: map[string]interface{}{}}
+}
+
+func parsePredefinedAnswer(raw, promptType string) (interface{}, error) {
+	switch promptType {
+	case "input", "select", "text":
+		return raw, nil
+	case "confirm":
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			return nil, fmt.Errorf("expected boolean, got %q", raw)
+		}
+		return v, nil
+	case "multiselect":
+		if strings.TrimSpace(raw) == "" {
+			return []string{}, nil
+		}
+		items := strings.Split(raw, ",")
+		out := make([]string, 0, len(items))
+		for _, i := range items {
+			out = append(out, strings.TrimSpace(i))
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unsupported prompt type %q", promptType)
+	}
+}
+
+func gatherRequestContext() plugins.RequestContext {
+	staged := []string{}
+	if out, err := gitOutput("diff", "--cached", "--name-only"); err == nil && out != "" {
+		staged = strings.Split(strings.TrimSpace(out), "\n")
+	}
+	repoRoot, _ := gitOutput("rev-parse", "--show-toplevel")
+	branch, _ := gitOutput("rev-parse", "--abbrev-ref", "HEAD")
+	head, _ := gitOutput("rev-parse", "HEAD")
+	name, _ := gitOutput("config", "--get", "user.name")
+	email, _ := gitOutput("config", "--get", "user.email")
+
+	return plugins.RequestContext{
+		RepoRoot:     strings.TrimSpace(repoRoot),
+		Branch:       strings.TrimSpace(branch),
+		Head:         strings.TrimSpace(head),
+		StagedFiles:  staged,
+		GitUserName:  strings.TrimSpace(name),
+		GitUserEmail: strings.TrimSpace(email),
+		TimestampUTC: time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+func findPredefined(predefined map[string]string, formID, fieldID string) (string, bool) {
+	if predefined == nil {
+		return "", false
+	}
+	if v, ok := predefined[formID+"."+fieldID]; ok {
+		return v, true
+	}
+	v, ok := predefined[fieldID]
+	return v, ok
+}
+
+func gitOutput(args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return out.String(), nil
 }
 
 func runPluginSubcommand(args []string) error {
@@ -105,4 +674,24 @@ func runPluginSubcommand(args []string) error {
 	default:
 		return fmt.Errorf("unknown plugin subcommand %q", args[0])
 	}
+}
+
+func runGitCommit(message string) error {
+	cmd := exec.Command("git", "commit", "-m", message)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w\nOutput:\n%s", err, string(output))
+	}
+	return nil
+}
+
+func buildAutoAnswersByPlugin(runtimePlugins []plugins.RuntimePlugin) map[string]map[string]interface{} {
+	out := map[string]map[string]interface{}{}
+	for _, rp := range runtimePlugins {
+		if len(rp.AIAuto) == 0 {
+			continue
+		}
+		out[rp.Manifest.ID] = rp.AIAuto
+	}
+	return out
 }
