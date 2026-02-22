@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "builtin/body",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "./cmd/goodcommit-plugin-body"
+      },
+      "manifest_checksum": "sha256:3b3a424abac399f7181c8bdd6b5320836c1f07a990c938bf6ff699df2aba3fe8",
+      "hooks": [
+        "collect"
+      ],
+      "order": 50,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "ai_hints": {
+        "purpose": "Capture detailed body text.",
+        "instructions": "Write commit_body with implementation details and notable behavior changes."
+      },
+      "contract": {
+        "answers": [
+          {
+            "key": "commit_body",
+            "description": "Detailed body content.",
+            "type": "string",
+            "strategy": "infer_from_diff"
+          }
+        ]
+      },
+      "updated_at_utc": "2026-02-22T23:20:30Z"
+    },
+    {
+      "id": "builtin/conventional-title",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "./cmd/goodcommit-plugin-conventional-title"
+      },
+      "manifest_checksum": "sha256:daff04b494a2d6baddec4df923c2c0826fe002314364b884772897dd053069f0",
+      "hooks": [
+        "finalize"
+      ],
+      "order": 90,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "ai_hints": {
+        "purpose": "Compose final conventional title from collected metadata.",
+        "instructions": "No direct answers required."
+      },
+      "contract": {
+        "metadata_reads": [
+          {
+            "key": "gc.type",
+            "description": "Type id used in title.",
+            "required": true
+          },
+          {
+            "key": "gc.description",
+            "description": "Description text used in title.",
+            "required": true
+          },
+          {
+            "key": "gc.scope_emojis",
+            "description": "Optional scope emojis in title."
+          },
+          {
+            "key": "gc.breaking",
+            "description": "Optional breaking flag for ! marker."
+          }
+        ]
+      },
+      "updated_at_utc": "2026-02-22T23:20:30Z"
+    },
+    {
+      "id": "builtin/description",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "./cmd/goodcommit-plugin-description"
+      },
+      "manifest_checksum": "sha256:48ddec02178d88f5b862e5a40b75b7c678e857ae70c71d1a159fb1065a8d8314",
+      "hooks": [
+        "collect"
+      ],
+      "order": 30,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "ai_hints": {
+        "purpose": "Capture concise commit summary text.",
+        "instructions": "Fill commit_description with one short, lower-case sentence fragment (\u003c=72 chars)."
+      },
+      "contract": {
+        "answers": [
+          {
+            "key": "commit_description",
+            "description": "Short summary phrase.",
+            "type": "string",
+            "required": true,
+            "strategy": "infer_from_diff"
+          }
+        ],
+        "metadata_writes": [
+          {
+            "key": "gc.description",
+            "description": "Normalized description text."
+          }
+        ]
+      },
+      "updated_at_utc": "2026-02-22T23:20:30Z"
+    },
+    {
+      "id": "builtin/types",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "./cmd/goodcommit-plugin-types"
+      },
+      "manifest_checksum": "sha256:ca08ca9e14f372135bef60555365b5c45554d87dd17e69c1f44b2a050a30eeb7",
+      "hooks": [
+        "collect"
+      ],
+      "order": 1,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "ai_hints": {
+        "purpose": "Select conventional commit type.",
+        "instructions": "Infer commit_type from staged diff intent. Prefer feat/fix/chore/docs/refactor patterns."
+      },
+      "contract": {
+        "answers": [
+          {
+            "key": "commit_type",
+            "description": "Conventional commit type id.",
+            "type": "string",
+            "required": true,
+            "strategy": "infer_from_diff"
+          }
+        ],
+        "metadata_writes": [
+          {
+            "key": "gc.type",
+            "description": "Selected commit type id."
+          }
+        ]
+      },
+      "updated_at_utc": "2026-02-22T23:20:30Z"
+    }
+  ]
+}

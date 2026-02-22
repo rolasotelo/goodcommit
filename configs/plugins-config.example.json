@@ -9,6 +9,42 @@
       "failure_mode": "fail_closed",
       "timeout_ms": 10000,
       "config": { "path": "./configs/commit-types.json" }
+    },
+    {
+      "id": "builtin/description",
+      "enabled": true,
+      "manifest": "./plugins/description.manifest.json",
+      "source": {
+        "type": "path",
+        "path": "./cmd/goodcommit-plugin-description"
+      },
+      "order": 30,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "config": {}
+    },
+    {
+      "id": "builtin/body",
+      "enabled": true,
+      "manifest": "./plugins/body.manifest.json",
+      "source": { "type": "path", "path": "./cmd/goodcommit-plugin-body" },
+      "order": 50,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": {}
+    },
+    {
+      "id": "builtin/conventional-title",
+      "enabled": true,
+      "manifest": "./plugins/conventional-title.manifest.json",
+      "source": {
+        "type": "path",
+        "path": "./cmd/goodcommit-plugin-conventional-title"
+      },
+      "order": 90,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "config": {}
     }
   ]
 }
