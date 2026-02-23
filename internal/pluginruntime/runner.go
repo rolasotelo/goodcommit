@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -18,11 +19,15 @@ const (
 
 // Runner executes plugin processes and validates protocol behavior.
 type Runner struct {
-	DefaultTimeout  time.Duration
-	MaxOutputBytes  int
-	PromptHandler   PromptHandler
-	UIHandler       UIHandler
-	MaxPromptRounds int
+	DefaultTimeout       time.Duration
+	MaxOutputBytes       int
+	PromptHandler        PromptHandler
+	UIHandler            UIHandler
+	MaxPromptRounds      int
+	AllowPluginNetwork   bool
+	AllowPluginGitWrite  bool
+	AllowFilesystemWrite bool
+	AllowPluginSecrets   bool
 }
 
 // PromptHandler resolves plugin prompt requests into answer values by prompt ID.
@@ -33,9 +38,13 @@ type UIHandler func(pluginID string, forms []UIRequest) (map[string]interface{},
 
 func NewRunner() *Runner {
 	return &Runner{
-		DefaultTimeout:  defaultPluginTimeout,
-		MaxOutputBytes:  defaultMaxOutputSize,
-		MaxPromptRounds: 2,
+		DefaultTimeout:       defaultPluginTimeout,
+		MaxOutputBytes:       defaultMaxOutputSize,
+		MaxPromptRounds:      2,
+		AllowPluginNetwork:   false,
+		AllowPluginGitWrite:  false,
+		AllowFilesystemWrite: false,
+		AllowPluginSecrets:   false,
 	}
 }
 
@@ -161,6 +170,9 @@ func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Inv
 	if err := validateRequest(req); err != nil {
 		return Invocation{}, fmt.Errorf("request validation failed: %w", err)
 	}
+	if err := r.checkPermissions(rp.Manifest.ID, rp.Manifest.Permissions); err != nil {
+		return Invocation{}, err
+	}
 
 	rawReq, err := json.Marshal(req)
 	if err != nil {
@@ -179,10 +191,8 @@ func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Inv
 
 	cmd := exec.CommandContext(ctx, rp.Manifest.Entrypoint.Command, rp.Manifest.Entrypoint.Args...)
 	cmd.Stdin = bytes.NewReader(rawReq)
-	cmd.Env = append([]string{}, os.Environ()...)
-	for k, v := range rp.Manifest.Entrypoint.Env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-	}
+	cmd.Dir = req.Context.RepoRoot
+	cmd.Env = buildPluginEnv(rp.Manifest.Permissions.Secrets, rp.Manifest.Entrypoint.Env)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -221,6 +231,59 @@ func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Inv
 		Stderr:   stderr.String(),
 		Duration: duration,
 	}, nil
+}
+
+func (r *Runner) checkPermissions(pluginID string, p Permissions) error {
+	if p.Network && !r.AllowPluginNetwork {
+		return fmt.Errorf("plugin %s requires network permission; re-run with --allow-plugin-network", pluginID)
+	}
+	if p.GitWrite && !r.AllowPluginGitWrite {
+		return fmt.Errorf("plugin %s requires git_write permission; re-run with --allow-plugin-git-write", pluginID)
+	}
+	if len(p.FilesystemWrite) > 0 && !r.AllowFilesystemWrite {
+		return fmt.Errorf("plugin %s requires filesystem_write permission; re-run with --allow-plugin-filesystem-write", pluginID)
+	}
+	if len(p.Secrets) > 0 && !r.AllowPluginSecrets {
+		return fmt.Errorf("plugin %s requires secrets permission; re-run with --allow-plugin-secrets", pluginID)
+	}
+	return nil
+}
+
+func buildPluginEnv(requestedSecrets []string, manifestEnv map[string]string) []string {
+	allowlist := []string{
+		"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "USER", "LOGNAME", "SHELL",
+		"LANG", "LC_ALL", "LC_CTYPE", "TERM",
+	}
+	env := make([]string, 0, len(allowlist)+len(requestedSecrets)+len(manifestEnv))
+	added := map[string]bool{}
+
+	addVar := func(name, value string) {
+		if name == "" || added[name] {
+			return
+		}
+		added[name] = true
+		env = append(env, fmt.Sprintf("%s=%s", name, value))
+	}
+
+	for _, name := range allowlist {
+		if v, ok := os.LookupEnv(name); ok {
+			addVar(name, v)
+		}
+	}
+	for _, name := range requestedSecrets {
+		key := strings.TrimSpace(name)
+		if key == "" {
+			continue
+		}
+		if v, ok := os.LookupEnv(key); ok {
+			addVar(key, v)
+		}
+	}
+	for k, v := range manifestEnv {
+		addVar(k, v)
+	}
+
+	return env
 }
 
 // ApplyMutations applies plugin mutations to a draft in a deterministic order.

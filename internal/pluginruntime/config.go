@@ -47,6 +47,7 @@ type PluginConfig struct {
 type ResolvedPlugin struct {
 	Runtime      RuntimePlugin
 	ManifestPath string
+	ManifestSHA  string
 	Source       LockedSource
 }
 
@@ -80,16 +81,39 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 		if !p.Enabled {
 			continue
 		}
-		if p.Manifest == "" {
+		builtinDef, isBuiltin := builtinByID(p.ID)
+
+		var (
+			manifestPath string
+			manifestSHA  string
+			manifest     Manifest
+			err          error
+		)
+
+		if p.Manifest != "" {
+			manifestPath = resolvePath(baseDir, p.Manifest)
+			var manifestRaw []byte
+			manifest, manifestRaw, err = ReadManifestWithRaw(manifestPath)
+			if err != nil {
+				return nil, fmt.Errorf("plugin %q manifest error: %w", p.ID, err)
+			}
+			manifestSHA = BytesSHA256(manifestRaw)
+		} else if isBuiltin {
+			manifest, manifestSHA, err = builtinManifest(p.ID)
+			if err != nil {
+				return nil, err
+			}
+		} else {
 			return nil, fmt.Errorf("plugin %q missing manifest path", p.ID)
-		}
-		manifestPath := resolvePath(baseDir, p.Manifest)
-		manifest, err := ReadManifest(manifestPath)
-		if err != nil {
-			return nil, fmt.Errorf("plugin %q manifest error: %w", p.ID, err)
 		}
 		if p.ID != "" && p.ID != manifest.ID {
 			return nil, fmt.Errorf("plugin id mismatch config=%q manifest=%q", p.ID, manifest.ID)
+		}
+		if p.Source.Type == "" && isBuiltin {
+			p.Source = builtinDef.DefaultSource
+		}
+		if p.Source.Type == "" && p.Source.Path != "" {
+			p.Source.Type = "path"
 		}
 		if len(p.Hooks) > 0 {
 			return nil, fmt.Errorf("plugin %q: overriding manifest hooks from config is not allowed", manifest.ID)
@@ -122,6 +146,7 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 		resolved = append(resolved, ResolvedPlugin{
 			Runtime:      rp,
 			ManifestPath: manifestPath,
+			ManifestSHA:  manifestSHA,
 			Source: LockedSource{
 				Type:     p.Source.Type,
 				Repo:     p.Source.Repo,

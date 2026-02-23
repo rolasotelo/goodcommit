@@ -23,6 +23,8 @@ The lockfile stores resolved plugin sources and checksums for reproducibility.
         "checksum": "sha256:..."
       },
       "manifest_checksum": "sha256:...",
+      "executable_path": ".goodcommit/plugins/bin/community-title-regex",
+      "executable_checksum": "sha256:...",
       "updated_at_utc": "2026-02-16T18:00:00Z"
     }
   ]
@@ -31,10 +33,10 @@ The lockfile stores resolved plugin sources and checksums for reproducibility.
 
 ## Workflow
 
-1. Install/resolve plugin source (`path`, `git`, or `builtin`).
+1. Install/resolve plugin source (`path`, `git`, or `builtin`) and build executable artifacts into `.goodcommit/plugins/bin`.
 2. Read plugin manifest and compute checksum.
 3. Upsert lockfile entry.
-4. At runtime, verify source and manifest checksums before execution.
+4. At runtime, verify source, manifest, and executable checksums before execution.
 5. Refuse execution on mismatch unless user explicitly re-locks.
 
 ## Verification APIs

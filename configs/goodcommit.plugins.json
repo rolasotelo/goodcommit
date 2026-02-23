@@ -3,8 +3,6 @@
     {
       "id": "builtin/types",
       "enabled": true,
-      "manifest": "./plugins/types.manifest.json",
-      "source": { "type": "path", "path": "./cmd/goodcommit-plugin-types" },
       "order": 1,
       "failure_mode": "fail_closed",
       "timeout_ms": 10000,
@@ -13,11 +11,6 @@
     {
       "id": "builtin/description",
       "enabled": true,
-      "manifest": "./plugins/description.manifest.json",
-      "source": {
-        "type": "path",
-        "path": "./cmd/goodcommit-plugin-description"
-      },
       "order": 30,
       "failure_mode": "fail_closed",
       "timeout_ms": 10000,
@@ -26,8 +19,6 @@
     {
       "id": "builtin/body",
       "enabled": true,
-      "manifest": "./plugins/body.manifest.json",
-      "source": { "type": "path", "path": "./cmd/goodcommit-plugin-body" },
       "order": 50,
       "failure_mode": "fail_open",
       "timeout_ms": 10000,
@@ -36,11 +27,6 @@
     {
       "id": "builtin/conventional-title",
       "enabled": true,
-      "manifest": "./plugins/conventional-title.manifest.json",
-      "source": {
-        "type": "path",
-        "path": "./cmd/goodcommit-plugin-conventional-title"
-      },
       "order": 90,
       "failure_mode": "fail_closed",
       "timeout_ms": 10000,

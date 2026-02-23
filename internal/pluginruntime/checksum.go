@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+func BytesSHA256(raw []byte) string {
+	sum := sha256.Sum256(raw)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
 func FileSHA256(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

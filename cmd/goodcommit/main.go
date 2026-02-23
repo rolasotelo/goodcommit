@@ -15,6 +15,10 @@ Flags:
 	--plugins-config       Path to a plugin configuration file
 	--plugins-lockfile     Path to a plugin lockfile (default: goodcommit.plugins.lock)
 	--plugins-skip-verify  Skip plugin lockfile verification
+	--allow-plugin-network Allow plugins that request network permission
+	--allow-plugin-git-write Allow plugins that request git_write permission
+	--allow-plugin-filesystem-write Allow plugins that request filesystem_write permission
+	--allow-plugin-secrets Allow plugins that request secrets permission
 	--plugin-answer        Provide answer for plugin prompts/forms as key=value (repeatable)
 	--retry                Retry commit with the last saved commit message
 	--edit                 Edit the last saved commit message
@@ -89,6 +93,10 @@ func main() {
 	flag.StringVar(&pluginsLockfilePath, "plugins-lockfile", pluginsLockfilePath, "Path to a plugin lockfile")
 
 	pluginsSkipVerify := flag.Bool("plugins-skip-verify", false, "Skip plugin lockfile verification")
+	allowPluginNetwork := flag.Bool("allow-plugin-network", false, "Allow plugins that request network permission")
+	allowPluginGitWrite := flag.Bool("allow-plugin-git-write", false, "Allow plugins that request git_write permission")
+	allowPluginFilesystemWrite := flag.Bool("allow-plugin-filesystem-write", false, "Allow plugins that request filesystem_write permission")
+	allowPluginSecrets := flag.Bool("allow-plugin-secrets", false, "Allow plugins that request secrets permission")
 	messageOverride := flag.String("message", "", "Use an initial commit message before plugin phases")
 	var pluginAnswers pluginAnswerFlag
 	flag.Var(&pluginAnswers, "plugin-answer", "Provide answer for plugin prompts/forms as key=value (repeatable)")
@@ -164,14 +172,20 @@ func main() {
 		fmt.Println("Error loading plugins config:", err)
 		os.Exit(1)
 	}
+	runtimePlugins := plugins.RuntimePlugins(resolvedPlugins)
 	if !*pluginsSkipVerify {
 		if err := plugins.VerifyResolvedPlugins(resolvedPlugins, pluginsLockfilePath); err != nil {
 			fmt.Printf("Plugin lockfile verification failed (%s): %v\n", pluginsLockfilePath, err)
 			fmt.Println("Run: goodcommit plugin lock --plugins-config <path> --plugins-lockfile <path>")
 			os.Exit(1)
 		}
+		runtimePlugins, err = plugins.RuntimePluginsFromLock(resolvedPlugins, pluginsLockfilePath)
+		if err != nil {
+			fmt.Printf("Error loading plugin executables from lockfile (%s): %v\n", pluginsLockfilePath, err)
+			fmt.Println("Run: goodcommit plugin lock --plugins-config <path> --plugins-lockfile <path>")
+			os.Exit(1)
+		}
 	}
-	runtimePlugins := plugins.RuntimePlugins(resolvedPlugins)
 	autoAnswersByPlugin := buildAutoAnswersByPlugin(runtimePlugins)
 
 	draft := plugins.CommitDraft{Metadata: map[string]interface{}{}}
@@ -183,6 +197,10 @@ func main() {
 	runner := plugins.NewRunner()
 	runner.PromptHandler = makePromptResolver(pluginAnswers, autoAnswersByPlugin, accessible)
 	runner.UIHandler = makeUIResolver(pluginAnswers, autoAnswersByPlugin, accessible)
+	runner.AllowPluginNetwork = *allowPluginNetwork
+	runner.AllowPluginGitWrite = *allowPluginGitWrite
+	runner.AllowFilesystemWrite = *allowPluginFilesystemWrite
+	runner.AllowPluginSecrets = *allowPluginSecrets
 
 	invocations, err := runPluginPhases(context.Background(), runner, runtimePlugins, reqCtx, &draft, []plugins.HookPhase{
 		plugins.HookCollect,
@@ -622,7 +640,7 @@ func runPluginSubcommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		lf, err := plugins.BuildLockfileFromResolved(resolved)
+		lf, err := plugins.BuildLockfileWithArtifacts(resolved, *pluginsLockfilePath)
 		if err != nil {
 			return err
 		}

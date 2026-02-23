@@ -12,6 +12,22 @@ func ReadManifest(path string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
+	return ParseManifest(raw)
+}
+
+func ReadManifestWithRaw(path string) (Manifest, []byte, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return Manifest{}, nil, err
+	}
+	m, err := ParseManifest(raw)
+	if err != nil {
+		return Manifest{}, nil, err
+	}
+	return m, raw, nil
+}
+
+func ParseManifest(raw []byte) (Manifest, error) {
 	var m Manifest
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()

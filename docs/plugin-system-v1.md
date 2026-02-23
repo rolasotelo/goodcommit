@@ -148,7 +148,7 @@ Per-plugin `failure_mode`:
 
 ## Suggested Config Model
 
-See `docs/examples/plugins-config.example.json`.
+See `configs/plugins-config.example.json`.
 
 Key ideas:
 

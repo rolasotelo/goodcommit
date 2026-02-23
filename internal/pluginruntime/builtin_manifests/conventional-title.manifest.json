@@ -1,0 +1,41 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/conventional-title",
+  "name": "Conventional Title Composer",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {
+    "type": "exec",
+    "command": "go",
+    "args": ["run", "./cmd/goodcommit-plugin-conventional-title"]
+  },
+  "hooks": ["finalize"],
+  "permissions": { "network": false, "git_read": false, "git_write": false },
+  "contract": {
+    "metadata_reads": [
+      {
+        "key": "gc.type",
+        "description": "Type id used in title.",
+        "required": true
+      },
+      {
+        "key": "gc.description",
+        "description": "Description text used in title.",
+        "required": true
+      },
+      {
+        "key": "gc.scope_emojis",
+        "description": "Optional scope emojis in title."
+      },
+      {
+        "key": "gc.breaking",
+        "description": "Optional breaking flag for ! marker."
+      }
+    ]
+  },
+  "ai_hints": {
+    "purpose": "Compose final conventional title from collected metadata.",
+    "instructions": "No direct answers required."
+  }
+}

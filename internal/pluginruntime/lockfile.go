@@ -23,18 +23,20 @@ type LockedSource struct {
 
 // LockedPlugin captures reproducible plugin resolution data.
 type LockedPlugin struct {
-	ID               string                 `json:"id"`
-	Version          string                 `json:"version,omitempty"`
-	Source           LockedSource           `json:"source"`
-	ManifestChecksum string                 `json:"manifest_checksum"`
-	Hooks            []HookPhase            `json:"hooks,omitempty"`
-	Order            int                    `json:"order,omitempty"`
-	FailureMode      FailureMode            `json:"failure_mode,omitempty"`
-	TimeoutMS        int                    `json:"timeout_ms,omitempty"`
-	AIHints          *api.AIHints           `json:"ai_hints,omitempty"`
-	Contract         *api.PluginContract    `json:"contract,omitempty"`
-	AIAuto           map[string]interface{} `json:"ai_auto_answers,omitempty"`
-	UpdatedAtUTC     string                 `json:"updated_at_utc"`
+	ID                 string                 `json:"id"`
+	Version            string                 `json:"version,omitempty"`
+	Source             LockedSource           `json:"source"`
+	ManifestChecksum   string                 `json:"manifest_checksum"`
+	ExecutablePath     string                 `json:"executable_path,omitempty"`
+	ExecutableChecksum string                 `json:"executable_checksum,omitempty"`
+	Hooks              []HookPhase            `json:"hooks,omitempty"`
+	Order              int                    `json:"order,omitempty"`
+	FailureMode        FailureMode            `json:"failure_mode,omitempty"`
+	TimeoutMS          int                    `json:"timeout_ms,omitempty"`
+	AIHints            *api.AIHints           `json:"ai_hints,omitempty"`
+	Contract           *api.PluginContract    `json:"contract,omitempty"`
+	AIAuto             map[string]interface{} `json:"ai_auto_answers,omitempty"`
+	UpdatedAtUTC       string                 `json:"updated_at_utc"`
 }
 
 // Lockfile defines plugin source pinning data.
