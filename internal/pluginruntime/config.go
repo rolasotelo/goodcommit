@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -159,7 +160,62 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 		})
 	}
 
+	if err := validateUIGroupContiguity(resolved); err != nil {
+		return nil, err
+	}
+
 	return resolved, nil
+}
+
+func validateUIGroupContiguity(resolved []ResolvedPlugin) error {
+	hooks := []HookPhase{
+		HookCollect,
+		HookValidate,
+		HookEnrich,
+		HookFinalize,
+		HookPreCommit,
+		HookPostCommit,
+	}
+
+	for _, hook := range hooks {
+		pluginsInHook := make([]RuntimePlugin, 0, len(resolved))
+		for _, rp := range resolved {
+			if supportsHook(rp.Runtime.Manifest.Hooks, hook) {
+				pluginsInHook = append(pluginsInHook, rp.Runtime)
+			}
+		}
+		sort.Slice(pluginsInHook, func(i, j int) bool {
+			if pluginsInHook[i].Order == pluginsInHook[j].Order {
+				return pluginsInHook[i].Manifest.ID < pluginsInHook[j].Manifest.ID
+			}
+			return pluginsInHook[i].Order < pluginsInHook[j].Order
+		})
+
+		closed := map[string]bool{}
+		current := ""
+		for _, rp := range pluginsInHook {
+			group := strings.TrimSpace(rp.UIGroup)
+			if group == "" {
+				if current != "" {
+					closed[current] = true
+					current = ""
+				}
+				continue
+			}
+			if group == current {
+				continue
+			}
+			if closed[group] {
+				return fmt.Errorf("ui_group %q is not contiguous for hook %s (plugin %s)", group, hook, rp.Manifest.ID)
+			}
+			if current != "" {
+				closed[current] = true
+			}
+			current = group
+		}
+	}
+
+	return nil
 }
 
 func aiHintsOrDefault(h *api.AIHints) *api.AIHints {
