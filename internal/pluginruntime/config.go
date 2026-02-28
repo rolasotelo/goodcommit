@@ -33,6 +33,7 @@ type PluginConfig struct {
 	Enabled              bool                   `json:"enabled"`
 	Manifest             string                 `json:"manifest"`
 	Source               SourceConfig           `json:"source"`
+	UIGroup              string                 `json:"ui_group,omitempty"`
 	Order                int                    `json:"order"`
 	FailureMode          FailureMode            `json:"failure_mode"`
 	TimeoutMS            int                    `json:"timeout_ms"`
@@ -138,6 +139,7 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 			Config:      p.Config,
 			AIHints:     aiHints,
 			AIAuto:      p.AIAuto,
+			UIGroup:     strings.TrimSpace(p.UIGroup),
 			Order:       p.Order,
 			FailureMode: p.FailureMode,
 			Timeout:     timeout,

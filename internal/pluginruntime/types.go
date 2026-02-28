@@ -60,6 +60,7 @@ type RuntimePlugin struct {
 	Config      map[string]interface{}
 	AIHints     *api.AIHints
 	AIAuto      map[string]interface{}
+	UIGroup     string
 	Order       int
 	FailureMode FailureMode
 	Timeout     time.Duration

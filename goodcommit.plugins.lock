@@ -10,7 +10,7 @@
       },
       "manifest_checksum": "sha256:3b3a424abac399f7181c8bdd6b5320836c1f07a990c938bf6ff699df2aba3fe8",
       "executable_path": ".goodcommit/plugins/bin/builtin-body",
-      "executable_checksum": "sha256:323382b39c3ec9d834eec312e58aca7add9248c9860a7e60ee136de0953ae5e3",
+      "executable_checksum": "sha256:9aa427987665edb0e3d1d3d087f5e4c11c1562339fbfd4da43d91ceea2222c56",
       "hooks": [
         "collect"
       ],
@@ -31,7 +31,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-02-23T00:13:38Z"
+      "updated_at_utc": "2026-02-23T00:55:37Z"
     },
     {
       "id": "builtin/conventional-title",
@@ -42,7 +42,7 @@
       },
       "manifest_checksum": "sha256:daff04b494a2d6baddec4df923c2c0826fe002314364b884772897dd053069f0",
       "executable_path": ".goodcommit/plugins/bin/builtin-conventional-title",
-      "executable_checksum": "sha256:f10557366de83b53f9f6ec392eae75711e2d8f437d7a6fb750a6060f3e4933dc",
+      "executable_checksum": "sha256:a68561b57e447cdf04f787087cb31ad162e4c40afa41290dd482fd9c4169e0e4",
       "hooks": [
         "finalize"
       ],
@@ -75,7 +75,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-02-23T00:13:38Z"
+      "updated_at_utc": "2026-02-23T00:55:37Z"
     },
     {
       "id": "builtin/description",
@@ -86,7 +86,7 @@
       },
       "manifest_checksum": "sha256:48ddec02178d88f5b862e5a40b75b7c678e857ae70c71d1a159fb1065a8d8314",
       "executable_path": ".goodcommit/plugins/bin/builtin-description",
-      "executable_checksum": "sha256:94d8ae966cf71d418dc3f3da0ad7e2e98ec4a8d7d4b8ec6d18a3b7d647954822",
+      "executable_checksum": "sha256:b61d01847b5320a55a0b6f3c360f47ab0dc9e4b2b13aa2bb4ab26ede23e5fba6",
       "hooks": [
         "collect"
       ],
@@ -114,7 +114,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-02-23T00:13:38Z"
+      "updated_at_utc": "2026-02-23T00:55:37Z"
     },
     {
       "id": "builtin/types",
@@ -125,7 +125,7 @@
       },
       "manifest_checksum": "sha256:ca08ca9e14f372135bef60555365b5c45554d87dd17e69c1f44b2a050a30eeb7",
       "executable_path": ".goodcommit/plugins/bin/builtin-types",
-      "executable_checksum": "sha256:40b6d84d7fce5cecd784ee88fc93b3c55837f22f0e4b2a1209343dc6a4b56452",
+      "executable_checksum": "sha256:e362ed99a1b440f07b448fbed152b4ef4c9cbba0e97ead69d84abec53ee3d9f5",
       "hooks": [
         "collect"
       ],
@@ -153,7 +153,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-02-23T00:13:38Z"
+      "updated_at_utc": "2026-02-23T00:55:37Z"
     }
   ]
 }

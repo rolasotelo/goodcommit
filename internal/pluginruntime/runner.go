@@ -23,6 +23,7 @@ type Runner struct {
 	MaxOutputBytes       int
 	PromptHandler        PromptHandler
 	UIHandler            UIHandler
+	GroupedUIHandler     GroupedUIHandler
 	MaxPromptRounds      int
 	AllowPluginNetwork   bool
 	AllowPluginGitWrite  bool
@@ -35,6 +36,15 @@ type PromptHandler func(pluginID string, prompts []PromptRequest) (map[string]in
 
 // UIHandler resolves declarative UI requests into answer values by field ID.
 type UIHandler func(pluginID string, forms []UIRequest) (map[string]interface{}, error)
+
+// PluginUIBatchRequest groups one plugin's forms for same-page rendering.
+type PluginUIBatchRequest struct {
+	PluginID string
+	Forms    []UIRequest
+}
+
+// GroupedUIHandler resolves answers for a group of plugins shown on one page.
+type GroupedUIHandler func(groupID string, requests []PluginUIBatchRequest) (map[string]map[string]interface{}, error)
 
 func NewRunner() *Runner {
 	return &Runner{
@@ -59,36 +69,43 @@ func (r *Runner) RunPhase(ctx context.Context, hook HookPhase, draft *CommitDraf
 	})
 
 	results := make([]Invocation, 0, len(sorted))
-	for _, rp := range sorted {
+	for i := 0; i < len(sorted); i++ {
+		rp := sorted[i]
 		if !supportsHook(rp.Manifest.Hooks, hook) {
 			continue
 		}
-		request := Request{
-			ProtocolVersion: ProtocolVersionV1,
-			RequestID:       fmt.Sprintf("%s:%d", rp.Manifest.ID, time.Now().UnixNano()),
-			PluginID:        rp.Manifest.ID,
-			Hook:            hook,
-			PluginConfig:    rp.Config,
-			Context:         reqCtx,
-			Draft:           *draft,
+
+		if r.GroupedUIHandler != nil && strings.TrimSpace(rp.UIGroup) != "" {
+			group := []RuntimePlugin{rp}
+			j := i + 1
+			for ; j < len(sorted); j++ {
+				next := sorted[j]
+				if next.UIGroup != rp.UIGroup {
+					break
+				}
+				if supportsHook(next.Manifest.Hooks, hook) {
+					group = append(group, next)
+				}
+			}
+			if len(group) > 1 {
+				groupInvocations, stop, err := r.runGroupedUIPlugins(ctx, hook, draft, reqCtx, rp.UIGroup, group)
+				results = append(results, groupInvocations...)
+				if err != nil {
+					return results, err
+				}
+				if stop {
+					break
+				}
+				i = j - 1
+				continue
+			}
 		}
 
+		request := newPluginRequest(hook, reqCtx, *draft, rp)
 		invocation, err := r.invokeWithPrompts(ctx, rp, request)
 		if err != nil {
 			if rp.FailureMode == FailOpen {
-				results = append(results, Invocation{
-					PluginID: rp.Manifest.ID,
-					Hook:     hook,
-					Response: Response{
-						RequestID: request.RequestID,
-						OK:        false,
-						Diagnostics: []Diagnostic{{
-							Level:   "warn",
-							Message: fmt.Sprintf("plugin failed in fail_open mode: %v", err),
-							Code:    "PLUGIN_FAIL_OPEN",
-						}},
-					},
-				})
+				appendFailOpenInvocation(&results, rp, hook, request.RequestID, err)
 				continue
 			}
 			return results, err
@@ -107,6 +124,107 @@ func (r *Runner) RunPhase(ctx context.Context, hook HookPhase, draft *CommitDraf
 	return results, nil
 }
 
+func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft *CommitDraft, reqCtx RequestContext, groupID string, group []RuntimePlugin) ([]Invocation, bool, error) {
+	results := []Invocation{}
+
+	type groupedPending struct {
+		Plugin RuntimePlugin
+		Req    Request
+		Forms  []UIRequest
+	}
+
+	pending := make([]groupedPending, 0, len(group))
+	requests := make([]PluginUIBatchRequest, 0, len(group))
+
+	for _, rp := range group {
+		req := newPluginRequest(hook, reqCtx, *draft, rp)
+		invocation, err := r.Invoke(ctx, rp, req)
+		if err != nil {
+			if rp.FailureMode == FailOpen {
+				appendFailOpenInvocation(&results, rp, hook, req.RequestID, err)
+				continue
+			}
+			return results, false, err
+		}
+
+		if len(invocation.Response.PromptRequests) > 0 {
+			// Legacy prompt requests are handled with the normal mediation flow.
+			invocation, err = r.invokeWithPrompts(ctx, rp, req)
+			if err != nil {
+				if rp.FailureMode == FailOpen {
+					appendFailOpenInvocation(&results, rp, hook, req.RequestID, err)
+					continue
+				}
+				return results, false, err
+			}
+			if invocation.Response.Mutations != nil {
+				ApplyMutations(draft, *invocation.Response.Mutations)
+			}
+			results = append(results, invocation)
+			if invocation.Response.Fatal || invocation.Response.BlockCommit {
+				return results, true, nil
+			}
+			continue
+		}
+
+		if len(invocation.Response.UIRequests) == 0 {
+			if invocation.Response.Mutations != nil {
+				ApplyMutations(draft, *invocation.Response.Mutations)
+			}
+			results = append(results, invocation)
+			if invocation.Response.Fatal || invocation.Response.BlockCommit {
+				return results, true, nil
+			}
+			continue
+		}
+
+		pending = append(pending, groupedPending{
+			Plugin: rp,
+			Req:    req,
+			Forms:  invocation.Response.UIRequests,
+		})
+		requests = append(requests, PluginUIBatchRequest{
+			PluginID: rp.Manifest.ID,
+			Forms:    invocation.Response.UIRequests,
+		})
+	}
+
+	if len(pending) == 0 {
+		return results, false, nil
+	}
+
+	answersByPlugin, err := r.GroupedUIHandler(groupID, requests)
+	if err != nil {
+		return results, false, fmt.Errorf("grouped prompt mediation failed for %s: %w", groupID, err)
+	}
+
+	for _, item := range pending {
+		req := item.Req
+		if answers, ok := answersByPlugin[item.Plugin.Manifest.ID]; ok && len(answers) > 0 {
+			req.Answers = answers
+		}
+		invocation, err := r.invokeWithPrompts(ctx, item.Plugin, req)
+		if err != nil {
+			if item.Plugin.FailureMode == FailOpen {
+				appendFailOpenInvocation(&results, item.Plugin, hook, req.RequestID, err)
+				continue
+			}
+			return results, false, err
+		}
+
+		if invocation.Response.Mutations != nil {
+			ApplyMutations(draft, *invocation.Response.Mutations)
+		}
+		results = append(results, invocation)
+
+		if invocation.Response.Fatal || invocation.Response.BlockCommit {
+			return results, true, nil
+		}
+	}
+
+	return results, false, nil
+}
+
 func (r *Runner) invokeWithPrompts(ctx context.Context, rp RuntimePlugin, req Request) (Invocation, error) {
 	maxRounds := r.MaxPromptRounds
 	if maxRounds <= 0 {
@@ -114,6 +232,9 @@ func (r *Runner) invokeWithPrompts(ctx context.Context, rp RuntimePlugin, req Re
 	}
 
 	answers := map[string]interface{}{}
+	for k, v := range req.Answers {
+		answers[k] = v
+	}
 	for round := 0; round <= maxRounds; round++ {
 		if len(answers) > 0 {
 			req.Answers = answers
@@ -141,6 +262,34 @@ func (r *Runner) invokeWithPrompts(ctx context.Context, rp RuntimePlugin, req Re
 	}
 
 	return Invocation{}, fmt.Errorf("unreachable prompt mediation state")
+}
+
+func newPluginRequest(hook HookPhase, reqCtx RequestContext, draft CommitDraft, rp RuntimePlugin) Request {
+	return Request{
+		ProtocolVersion: ProtocolVersionV1,
+		RequestID:       fmt.Sprintf("%s:%d", rp.Manifest.ID, time.Now().UnixNano()),
+		PluginID:        rp.Manifest.ID,
+		Hook:            hook,
+		PluginConfig:    rp.Config,
+		Context:         reqCtx,
+		Draft:           draft,
+	}
+}
+
+func appendFailOpenInvocation(results *[]Invocation, rp RuntimePlugin, hook HookPhase, requestID string, err error) {
+	*results = append(*results, Invocation{
+		PluginID: rp.Manifest.ID,
+		Hook:     hook,
+		Response: Response{
+			RequestID: requestID,
+			OK:        false,
+			Diagnostics: []Diagnostic{{
+				Level:   "warn",
+				Message: fmt.Sprintf("plugin failed in fail_open mode: %v", err),
+				Code:    "PLUGIN_FAIL_OPEN",
+			}},
+		},
+	})
 }
 
 func (r *Runner) handlePluginUIRequests(pluginID string, resp Response) (map[string]interface{}, error) {

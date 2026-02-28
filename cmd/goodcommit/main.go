@@ -197,6 +197,7 @@ func main() {
 	runner := plugins.NewRunner()
 	runner.PromptHandler = makePromptResolver(pluginAnswers, autoAnswersByPlugin, accessible)
 	runner.UIHandler = makeUIResolver(pluginAnswers, autoAnswersByPlugin, accessible)
+	runner.GroupedUIHandler = makeGroupedUIResolver(pluginAnswers, autoAnswersByPlugin, accessible)
 	runner.AllowPluginNetwork = *allowPluginNetwork
 	runner.AllowPluginGitWrite = *allowPluginGitWrite
 	runner.AllowFilesystemWrite = *allowPluginFilesystemWrite
@@ -283,6 +284,12 @@ func makePromptResolver(predefined map[string]string, autoByPlugin map[string]ma
 func makeUIResolver(predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) plugins.UIHandler {
 	return func(pluginID string, forms []plugins.UIRequest) (map[string]interface{}, error) {
 		return resolveUIRequests(pluginID, forms, predefined, autoByPlugin, accessible)
+	}
+}
+
+func makeGroupedUIResolver(predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) plugins.GroupedUIHandler {
+	return func(groupID string, requests []plugins.PluginUIBatchRequest) (map[string]map[string]interface{}, error) {
+		return resolveGroupedUIRequests(groupID, requests, predefined, autoByPlugin, accessible)
 	}
 }
 
@@ -411,6 +418,145 @@ func resolveUIRequests(pluginID string, forms []plugins.UIRequest, predefined ma
 	}
 
 	return answers, nil
+}
+
+func resolveGroupedUIRequests(groupID string, requests []plugins.PluginUIBatchRequest, predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) (map[string]map[string]interface{}, error) {
+	answersByPlugin := map[string]map[string]interface{}{}
+	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+
+	for _, req := range requests {
+		if _, ok := answersByPlugin[req.PluginID]; !ok {
+			answersByPlugin[req.PluginID] = map[string]interface{}{}
+		}
+	}
+
+	if !isTTY {
+		for _, req := range requests {
+			for _, ui := range req.Forms {
+				for _, f := range ui.Fields {
+					if f.Type == "note" {
+						continue
+					}
+					raw, ok := findGroupedPredefined(predefined, req.PluginID, ui.ID, f.ID)
+					if !ok {
+						if autoVal, found := findAutoAnswer(autoByPlugin, req.PluginID, ui.ID, f.ID); found {
+							answersByPlugin[req.PluginID][f.ID] = autoVal
+							continue
+						}
+						if f.Required {
+							return nil, fmt.Errorf("group %s field %s.%s.%s requires TTY (or pass --plugin-answer %s.%s.%s=...)", groupID, req.PluginID, ui.ID, f.ID, req.PluginID, ui.ID, f.ID)
+						}
+						continue
+					}
+					value, err := parsePredefinedAnswer(raw, f.Type)
+					if err != nil {
+						return nil, fmt.Errorf("plugin %s field %s.%s invalid predefined answer: %w", req.PluginID, ui.ID, f.ID, err)
+					}
+					answersByPlugin[req.PluginID][f.ID] = value
+				}
+				answersByPlugin[req.PluginID][ui.ID+".__submitted"] = true
+			}
+		}
+		return answersByPlugin, nil
+	}
+
+	type localFieldRef struct {
+		pluginID string
+		fieldID  string
+		ref      interface{}
+	}
+	local := []localFieldRef{}
+	fields := []huh.Field{}
+
+	for _, req := range requests {
+		for _, ui := range req.Forms {
+			sectionTitle := ui.Title
+			if strings.TrimSpace(sectionTitle) == "" {
+				sectionTitle = ui.ID
+			}
+			sectionDesc := ui.Description
+			if sectionDesc == "" {
+				sectionDesc = "Fill required fields and submit."
+			}
+			fields = append(fields, huh.NewNote().Title(fmt.Sprintf("%s - %s", req.PluginID, sectionTitle)).Description(sectionDesc))
+
+			for _, f := range ui.Fields {
+				switch f.Type {
+				case "note":
+					fields = append(fields, huh.NewNote().Title(f.Title).Description(f.Description))
+				case "input":
+					v := f.Value
+					input := huh.NewInput().Title(f.Title).Description(f.Description).Placeholder(f.Placeholder).Value(&v)
+					if f.CharLimit > 0 {
+						input = input.CharLimit(f.CharLimit)
+					}
+					if f.Required {
+						input = input.Validate(func(s string) error {
+							if strings.TrimSpace(s) == "" {
+								return fmt.Errorf("value is required")
+							}
+							return nil
+						})
+					}
+					fields = append(fields, input)
+					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+				case "text":
+					v := f.Value
+					text := huh.NewText().Title(f.Title).Description(f.Description).Placeholder(f.Placeholder).Value(&v)
+					if f.Editor {
+						text = text.Editor("vim")
+					}
+					fields = append(fields, text)
+					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+				case "confirm":
+					var v bool
+					fields = append(fields, huh.NewConfirm().Title(f.Title).Description(f.Description).Value(&v))
+					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+				case "select":
+					opts := make([]huh.Option[string], 0, len(f.Options))
+					for _, o := range f.Options {
+						opts = append(opts, huh.NewOption(o.Label, o.Value))
+					}
+					v := ""
+					fields = append(fields, huh.NewSelect[string]().Title(f.Title).Description(f.Description).Options(opts...).Value(&v))
+					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+				case "multiselect":
+					opts := make([]huh.Option[string], 0, len(f.Options))
+					for _, o := range f.Options {
+						opts = append(opts, huh.NewOption(o.Label, o.Value))
+					}
+					v := []string{}
+					fields = append(fields, huh.NewMultiSelect[string]().Title(f.Title).Description(f.Description).Options(opts...).Value(&v))
+					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+				default:
+					return nil, fmt.Errorf("plugin %s field %s.%s has unsupported type %q", req.PluginID, ui.ID, f.ID, f.Type)
+				}
+			}
+		}
+	}
+
+	form := huh.NewForm(huh.NewGroup(fields...)).WithAccessible(accessible)
+	if err := form.Run(); err != nil {
+		return nil, fmt.Errorf("grouped form %s failed: %w", groupID, err)
+	}
+
+	for _, item := range local {
+		switch x := item.ref.(type) {
+		case *string:
+			answersByPlugin[item.pluginID][item.fieldID] = *x
+		case *bool:
+			answersByPlugin[item.pluginID][item.fieldID] = *x
+		case *[]string:
+			answersByPlugin[item.pluginID][item.fieldID] = *x
+		}
+	}
+	for _, req := range requests {
+		for _, ui := range req.Forms {
+			answersByPlugin[req.PluginID][ui.ID+".__submitted"] = true
+		}
+	}
+
+	return answersByPlugin, nil
 }
 
 func resolvePromptRequests(pluginID string, promptRequests []plugins.PromptRequest, predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) (map[string]interface{}, error) {
@@ -608,6 +754,19 @@ func findPredefined(predefined map[string]string, formID, fieldID string) (strin
 	}
 	v, ok := predefined[fieldID]
 	return v, ok
+}
+
+func findGroupedPredefined(predefined map[string]string, pluginID, formID, fieldID string) (string, bool) {
+	if predefined == nil {
+		return "", false
+	}
+	if v, ok := predefined[pluginID+"."+formID+"."+fieldID]; ok {
+		return v, true
+	}
+	if v, ok := predefined[pluginID+"."+fieldID]; ok {
+		return v, true
+	}
+	return findPredefined(predefined, formID, fieldID)
 }
 
 func gitOutput(args ...string) (string, error) {
