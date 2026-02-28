@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -120,7 +121,12 @@ func main() {
 		if editor == "" {
 			editor = "vim"
 		}
-		cmd := exec.Command(editor, ".goodcommit_msg.tmp")
+		msgPath := retryMessageFilePathForRead()
+		if err := os.MkdirAll(filepath.Dir(msgPath), 0o755); err != nil {
+			fmt.Printf("Error preparing temp message path: %s\n", err)
+			os.Exit(1)
+		}
+		cmd := exec.Command(editor, msgPath)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -138,7 +144,8 @@ func main() {
 	}
 
 	if *retry {
-		messageBytes, err := os.ReadFile(".goodcommit_msg.tmp")
+		msgPath := retryMessageFilePathForRead()
+		messageBytes, err := os.ReadFile(msgPath)
 		if err != nil {
 			fmt.Printf("Error reading saved commit message: %s\n", err)
 			os.Exit(1)
@@ -161,9 +168,7 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("Commit successful with the last saved commit message.")
-		if err := os.Remove(".goodcommit_msg.tmp"); err != nil {
-			fmt.Printf("Error removing temporary file: %s\n", err)
-		}
+		cleanupRetryMessageFiles()
 		os.Exit(0)
 	}
 
@@ -225,13 +230,18 @@ func main() {
 	}
 
 	if err := runGitCommit(message); err != nil {
-		errSave := os.WriteFile(".goodcommit_msg.tmp", []byte(message), 0o644)
+		msgPath := retryMessageFilePath()
+		if errMkdir := os.MkdirAll(filepath.Dir(msgPath), 0o755); errMkdir != nil {
+			fmt.Printf("Error preparing temp message path ('goodcommit --retry' won't work): %s\n", errMkdir)
+		}
+		errSave := os.WriteFile(msgPath, []byte(message), 0o644)
 		if errSave != nil {
-			fmt.Printf("Error saving commit message ('goodcommit --retry' won't work): %s\n", errSave)
+			fmt.Printf("Error saving commit message at %s ('goodcommit --retry' won't work): %s\n", msgPath, errSave)
 		}
 		fmt.Printf("Error executing command: %s\n", err)
 		os.Exit(1)
 	}
+	cleanupRetryMessageFiles()
 
 	postInvocations, postErr := runPluginPhases(context.Background(), runner, runtimePlugins, reqCtx, &draft, []plugins.HookPhase{plugins.HookPostCommit})
 	printPluginInvocations(postInvocations)
@@ -777,6 +787,27 @@ func gitOutput(args ...string) (string, error) {
 		return "", err
 	}
 	return out.String(), nil
+}
+
+func retryMessageFilePath() string {
+	if out, err := gitOutput("rev-parse", "--git-dir"); err == nil {
+		gitDir := strings.TrimSpace(out)
+		if gitDir != "" {
+			return filepath.Join(gitDir, "goodcommit", "last_failed_commit_message.txt")
+		}
+	}
+	return filepath.Join(".git", "goodcommit", "last_failed_commit_message.txt")
+}
+
+func retryMessageFilePathForRead() string {
+	return retryMessageFilePath()
+}
+
+func cleanupRetryMessageFiles() {
+	p := retryMessageFilePath()
+	if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("Warning: could not remove stale retry message file %s: %s\n", p, err)
+	}
 }
 
 func runPluginSubcommand(args []string) error {
