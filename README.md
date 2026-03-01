@@ -6,32 +6,52 @@ It runs a configurable plugin pipeline across commit phases (`collect`, `enrich`
 
 ## Quick Start
 
-1. Lock plugins:
+1. Install:
 
 ```bash
-go run ./cmd/goodcommit plugin lock \
-  --plugins-config ./configs/goodcommit.plugins.json \
-  --plugins-lockfile ./goodcommit.plugins.lock
+go install github.com/rolasotelo/goodcommit/cmd/goodcommit@latest
 ```
 
-2. Verify lockfile:
+2. Bootstrap config in your repository:
 
 ```bash
-go run ./cmd/goodcommit plugin verify \
-  --plugins-config ./configs/goodcommit.plugins.json \
-  --plugins-lockfile ./goodcommit.plugins.lock
+goodcommit init
 ```
+
+This scaffolds:
+
+- `configs/goodcommit.plugins.json`
+- `configs/commit-types.json`
+- `goodcommit.plugins.lock` (unless `--lock=false`)
 
 3. Run interactively:
 
 ```bash
-go run ./cmd/goodcommit
+goodcommit
 ```
 
 4. Dry run (no commit):
 
 ```bash
-go run ./cmd/goodcommit -m
+goodcommit -m
+```
+
+## Existing Repo Setup
+
+If config already exists and you only want to refresh lock/build artifacts:
+
+```bash
+goodcommit plugin lock \
+  --plugins-config ./configs/goodcommit.plugins.json \
+  --plugins-lockfile ./goodcommit.plugins.lock
+```
+
+Verify:
+
+```bash
+goodcommit plugin verify \
+  --plugins-config ./configs/goodcommit.plugins.json \
+  --plugins-lockfile ./goodcommit.plugins.lock
 ```
 
 ## Default Built-in Flow
@@ -61,7 +81,7 @@ Notes:
 You can provide answers via `--plugin-answer`:
 
 ```bash
-go run ./cmd/goodcommit \
+goodcommit \
   --plugin-answer commit_type=feat \
   --plugin-answer commit_description="add plugin lock verification" \
   -m
@@ -70,7 +90,7 @@ go run ./cmd/goodcommit \
 To inspect required/optional answers for automation/agents:
 
 ```bash
-go run ./cmd/goodcommit plugin context \
+goodcommit plugin context \
   --plugins-config ./configs/goodcommit.plugins.json \
   --plugins-lockfile ./goodcommit.plugins.lock
 ```
@@ -84,6 +104,18 @@ go run ./cmd/goodcommit plugin context \
 - Co-author options file: `configs/commit-coauthors.json`
 
 Built-in plugins can omit explicit `manifest`/`source` in config; runtime resolves them from embedded built-in definitions.
+
+## `init` Flags
+
+```bash
+goodcommit init [flags]
+```
+
+- `--plugins-config` path to scaffold plugins config (default `./configs/goodcommit.plugins.json`)
+- `--types-config` path to scaffold commit types config (default `./configs/commit-types.json`)
+- `--plugins-lockfile` lockfile output path (default `goodcommit.plugins.lock`)
+- `--lock` build+write lockfile after scaffolding (default `true`)
+- `--force` overwrite scaffold files if they already exist
 
 ## License
 
