@@ -13,14 +13,21 @@ import (
 const projectBinDir = ".goodcommit/plugins/bin"
 
 // BuildLockfileWithArtifacts writes lock metadata plus locally built plugin executables.
-func BuildLockfileWithArtifacts(resolved []ResolvedPlugin, lockPath string) (Lockfile, error) {
+func BuildLockfileWithArtifacts(resolved []ResolvedPlugin, lockPath, binDirOverride string) (Lockfile, error) {
 	lf, err := BuildLockfileFromResolved(resolved)
 	if err != nil {
 		return Lockfile{}, err
 	}
 
 	lockDir := filepath.Dir(lockPath)
-	binDir := filepath.Join(lockDir, projectBinDir)
+	lockDirAbs, err := filepath.Abs(lockDir)
+	if err != nil {
+		return Lockfile{}, fmt.Errorf("resolve lock directory: %w", err)
+	}
+	binDir, err := resolvePluginBinDir(lockDirAbs, binDirOverride)
+	if err != nil {
+		return Lockfile{}, err
+	}
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return Lockfile{}, fmt.Errorf("create plugin bin directory: %w", err)
 	}
@@ -35,7 +42,7 @@ func BuildLockfileWithArtifacts(resolved []ResolvedPlugin, lockPath string) (Loc
 		if !ok {
 			continue
 		}
-		execRel, execSum, err := installExecutable(lockDir, binDir, resolvedPlugin)
+		execRel, execSum, err := installExecutable(lockDirAbs, binDir, resolvedPlugin)
 		if err != nil {
 			return Lockfile{}, err
 		}
@@ -57,6 +64,10 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 		artifactName += ".exe"
 	}
 	artifactPath := filepath.Join(binDir, artifactName)
+	artifactPath, err := filepath.Abs(artifactPath)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve plugin artifact path %s: %w", artifactPath, err)
+	}
 
 	if err := buildPluginArtifact(artifactPath, target); err != nil {
 		return "", "", fmt.Errorf("build plugin %s: %w", rp.Runtime.Manifest.ID, err)
@@ -66,11 +77,11 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 	if err != nil {
 		return "", "", fmt.Errorf("checksum plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
 	}
-	rel, err := filepath.Rel(lockDir, artifactPath)
+	storedPath, err := pathForLockfile(lockDir, artifactPath)
 	if err != nil {
-		return "", "", fmt.Errorf("relative path for plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
+		return "", "", fmt.Errorf("path for plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
 	}
-	return filepath.ToSlash(rel), sum, nil
+	return storedPath, sum, nil
 }
 
 func buildPluginArtifact(artifactPath, target string) error {
@@ -135,6 +146,65 @@ func isModuleImportTarget(target string) bool {
 		!strings.HasPrefix(target, ".") &&
 		!strings.HasPrefix(target, "/") &&
 		strings.Contains(target, ".")
+}
+
+func resolvePluginBinDir(lockDir, override string) (string, error) {
+	trimmed := strings.TrimSpace(override)
+	if trimmed == "" || strings.EqualFold(trimmed, "gobin") {
+		gobin, err := discoverGoBin()
+		if err != nil {
+			return "", fmt.Errorf("resolve GOBIN: %w", err)
+		}
+		return gobin, nil
+	}
+	if strings.EqualFold(trimmed, "project") {
+		return filepath.Join(lockDir, projectBinDir), nil
+	}
+	if filepath.IsAbs(trimmed) {
+		return trimmed, nil
+	}
+	return filepath.Join(lockDir, trimmed), nil
+}
+
+func discoverGoBin() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("GOBIN")); v != "" {
+		return v, nil
+	}
+
+	cmd := exec.Command("go", "env", "GOBIN")
+	if out, err := cmd.Output(); err == nil {
+		if v := strings.TrimSpace(string(out)); v != "" {
+			return v, nil
+		}
+	}
+
+	cmd = exec.Command("go", "env", "GOPATH")
+	if out, err := cmd.Output(); err == nil {
+		gopath := strings.TrimSpace(string(out))
+		if gopath != "" {
+			paths := strings.Split(gopath, string(os.PathListSeparator))
+			if len(paths) > 0 && strings.TrimSpace(paths[0]) != "" {
+				return filepath.Join(strings.TrimSpace(paths[0]), "bin"), nil
+			}
+		}
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return "", fmt.Errorf("unable to determine go bin directory")
+	}
+	return filepath.Join(home, "go", "bin"), nil
+}
+
+func pathForLockfile(lockDir, artifactPath string) (string, error) {
+	rel, err := filepath.Rel(lockDir, artifactPath)
+	if err == nil {
+		isOutside := rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+		if !isOutside {
+			return filepath.ToSlash(rel), nil
+		}
+	}
+	return filepath.ToSlash(artifactPath), nil
 }
 
 func buildTarget(rp ResolvedPlugin) string {

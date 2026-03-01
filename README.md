@@ -43,6 +43,7 @@ If config already exists and you only want to refresh lock/build artifacts:
 ```bash
 goodcommit plugin lock \
   --plugins-config ./configs/goodcommit.plugins.json \
+  --plugins-bin-dir gobin \
   --plugins-lockfile ./goodcommit.plugins.lock
 ```
 
@@ -114,6 +115,7 @@ goodcommit init [flags]
 - `--plugins-config` path to scaffold plugins config (default `./configs/goodcommit.plugins.json`)
 - `--types-config` path to scaffold commit types config (default `./configs/commit-types.json`)
 - `--plugins-lockfile` lockfile output path (default `goodcommit.plugins.lock`)
+- `--plugins-bin-dir` executable output directory (default `gobin`, which resolves to `GOBIN`/Go bin dir)
 - `--lock` build+write lockfile after scaffolding (default `true`)
 - `--force` overwrite scaffold files if they already exist
 
