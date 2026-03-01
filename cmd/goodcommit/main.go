@@ -839,6 +839,7 @@ func runInitSubcommand(args []string) error {
 	pluginsConfigPath := fs.String("plugins-config", "./configs/goodcommit.plugins.json", "Path to write plugin config")
 	typesConfigPath := fs.String("types-config", "./configs/commit-types.json", "Path to write commit types config")
 	pluginsLockfilePath := fs.String("plugins-lockfile", "goodcommit.plugins.lock", "Path to write plugin lockfile")
+	pluginsBinDir := fs.String("plugins-bin-dir", "gobin", "Directory for built plugin executables (default: GOBIN)")
 	force := fs.Bool("force", false, "Overwrite scaffold files if they already exist")
 	withLock := fs.Bool("lock", true, "Generate plugin lockfile after scaffolding")
 	if err := fs.Parse(args); err != nil {
@@ -957,7 +958,7 @@ func runInitSubcommand(args []string) error {
 		resolved, err := plugins.LoadResolvedPlugins(*pluginsConfigPath)
 		if err != nil {
 			fmt.Printf("Warning: scaffold created but lock step failed to load plugins config: %v\n", err)
-		} else if lf, err := plugins.BuildLockfileWithArtifacts(resolved, *pluginsLockfilePath); err != nil {
+		} else if lf, err := plugins.BuildLockfileWithArtifacts(resolved, *pluginsLockfilePath, *pluginsBinDir); err != nil {
 			fmt.Printf("Warning: scaffold created but lock step failed: %v\n", err)
 		} else if err := plugins.WriteLockfile(*pluginsLockfilePath, lf); err != nil {
 			fmt.Printf("Warning: scaffold created but lockfile write failed: %v\n", err)
@@ -1004,6 +1005,7 @@ func runPluginSubcommand(args []string) error {
 		fs := flag.NewFlagSet("plugin lock", flag.ContinueOnError)
 		pluginsConfigPath := fs.String("plugins-config", "", "Path to a plugin configuration file")
 		pluginsLockfilePath := fs.String("plugins-lockfile", "goodcommit.plugins.lock", "Path to a plugin lockfile")
+		pluginsBinDir := fs.String("plugins-bin-dir", "gobin", "Directory for built plugin executables (default: GOBIN)")
 		if err := fs.Parse(args[1:]); err != nil {
 			if err == flag.ErrHelp {
 				return nil
@@ -1017,7 +1019,7 @@ func runPluginSubcommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		lf, err := plugins.BuildLockfileWithArtifacts(resolved, *pluginsLockfilePath)
+		lf, err := plugins.BuildLockfileWithArtifacts(resolved, *pluginsLockfilePath, *pluginsBinDir)
 		if err != nil {
 			return err
 		}
