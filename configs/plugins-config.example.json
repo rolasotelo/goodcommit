@@ -1,0 +1,127 @@
+{
+  "plugins": [
+    {
+      "id": "builtin/logo",
+      "enabled": true,
+      "ui_group": "intro",
+      "order": 1,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": { "path": "./configs/logo.ascii.txt" }
+    },
+    {
+      "id": "builtin/types",
+      "enabled": true,
+      "ui_group": "intro",
+      "ai_constraints": {
+        "commit_type": {
+          "allowed_values_from_json": {
+            "path": "./commit-types.json",
+            "array_key": "types",
+            "value_key": "id"
+          }
+        }
+      },
+      "order": 10,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "config": { "path": "./configs/commit-types.json" }
+    },
+    {
+      "id": "builtin/scopes",
+      "enabled": true,
+      "ai_constraints": {
+        "commit_scopes": {
+          "allowed_values_from_json": {
+            "path": "./commit-scopes.json",
+            "array_key": "scopes",
+            "value_key": "id"
+          }
+        }
+      },
+      "order": 20,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": { "path": "./configs/commit-scopes.json" }
+    },
+    {
+      "id": "builtin/description",
+      "enabled": true,
+      "ui_group": "compose_message",
+      "order": 30,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "config": {}
+    },
+    {
+      "id": "builtin/why",
+      "enabled": true,
+      "ui_group": "compose_message",
+      "order": 40,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": { "required": false }
+    },
+    {
+      "id": "builtin/body",
+      "enabled": true,
+      "ui_group": "compose_message",
+      "order": 50,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "source": { "type": "path", "path": "./cmd/goodcommit-plugin-body" },
+      "config": {}
+    },
+    {
+      "id": "builtin/breaking",
+      "enabled": true,
+      "order": 60,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": {},
+      "ai_auto_answers": { "is_breaking": false }
+    },
+    {
+      "id": "builtin/breakingmsg",
+      "enabled": true,
+      "order": 70,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": {}
+    },
+    {
+      "id": "builtin/coauthors",
+      "enabled": true,
+      "ai_constraints": {
+        "coauthors_selected": {
+          "allowed_values_from_json": {
+            "path": "./commit-coauthors.json",
+            "array_key": "coauthors",
+            "value_key": "id"
+          }
+        }
+      },
+      "order": 80,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": { "path": "./configs/commit-coauthors.json" },
+      "ai_auto_answers": { "coauthors_selected": [] }
+    },
+    {
+      "id": "builtin/conventional-title",
+      "enabled": true,
+      "order": 90,
+      "failure_mode": "fail_closed",
+      "timeout_ms": 10000,
+      "config": {}
+    },
+    {
+      "id": "builtin/signedoffby",
+      "enabled": true,
+      "order": 100,
+      "failure_mode": "fail_open",
+      "timeout_ms": 10000,
+      "config": { "trailer_key": "Signed-off-by" }
+    }
+  ]
+}

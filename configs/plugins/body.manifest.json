@@ -1,0 +1,29 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/body",
+  "name": "Body",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {
+    "type": "exec",
+    "command": "go",
+    "args": ["run", "./cmd/goodcommit-plugin-body"]
+  },
+  "hooks": ["collect"],
+  "permissions": { "network": false, "git_read": false, "git_write": false },
+  "contract": {
+    "answers": [
+      {
+        "key": "commit_body",
+        "description": "Detailed body content.",
+        "type": "string",
+        "strategy": "infer_from_diff"
+      }
+    ]
+  },
+  "ai_hints": {
+    "purpose": "Capture detailed body text.",
+    "instructions": "Write commit_body with implementation details and notable behavior changes."
+  }
+}

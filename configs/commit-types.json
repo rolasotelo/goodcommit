@@ -1,0 +1,22 @@
+{
+  "types": [
+    {
+      "emoji": "✨",
+      "id": "feat",
+      "name": "Feat",
+      "title": "New commit introduces a new feature"
+    },
+    {
+      "emoji": "🐞",
+      "id": "fix",
+      "name": "Fix",
+      "title": "This commit patches a bug"
+    },
+    {
+      "emoji": "🧰",
+      "id": "chore",
+      "name": "Chore",
+      "title": "For all other tasks"
+    }
+  ]
+}

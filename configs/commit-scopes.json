@@ -1,0 +1,37 @@
+{
+  "scopes": [
+    {
+      "id": "goodcommit",
+      "name": "Goodcommit",
+      "description": "Core CLI/runtime behavior and commit flow.",
+      "emoji": "\ud83d\udd2b",
+      "conditional": [
+        "feat",
+        "fix",
+        "chore"
+      ]
+    },
+    {
+      "id": "builtin-plugin",
+      "name": "Builtin Plugin",
+      "description": "Built-in plugin logic, manifests, and plugin UX.",
+      "emoji": "\ud83d\udd0c",
+      "conditional": [
+        "feat",
+        "fix",
+        "chore"
+      ]
+    },
+    {
+      "id": "ci",
+      "name": "CI",
+      "description": "Pipelines, checks, and automation workflows.",
+      "emoji": "\ud83e\uddea",
+      "conditional": [
+        "feat",
+        "fix",
+        "chore"
+      ]
+    }
+  ]
+}

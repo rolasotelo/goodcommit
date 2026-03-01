@@ -1,0 +1,25 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/scopes",
+  "name": "Scopes",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-scopes"]},
+  "hooks": ["collect", "enrich"],
+  "permissions": {"network": false, "git_read": false, "git_write": false},
+  "contract": {
+    "answers": [
+      {"key": "commit_scopes", "description": "Array of scope ids.", "type": "[]string", "strategy": "infer_from_diff"}
+    ],
+    "metadata_reads": [{"key": "gc.type", "description": "Type selection drives valid scopes.", "required": true}],
+    "metadata_writes": [
+      {"key": "gc.scope_names", "description": "Selected scope names."},
+      {"key": "gc.scope_emojis", "description": "Selected scope emoji sequence."}
+    ]
+  },
+  "ai_hints": {
+    "purpose": "Attach scope metadata and enrich body with scope section.",
+    "instructions": "Choose one or more commit_scopes that best match changed areas."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/logo",
+  "name": "Logo",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-logo"]},
+  "hooks": ["collect"],
+  "permissions": {"network": false, "git_read": false, "git_write": false},
+  "contract": {
+    "metadata_writes": [{"key": "gc.logo_seen", "description": "Whether banner step was shown."}]
+  },
+  "ai_hints": {
+    "purpose": "Render a static banner before data collection.",
+    "instructions": "No answer values required unless the plugin asks for acknowledgement in interactive mode."
+  }
+}

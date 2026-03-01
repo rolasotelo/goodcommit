@@ -1,0 +1,22 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/breaking",
+  "name": "Breaking",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-breaking"]},
+  "hooks": ["collect"],
+  "permissions": {"network": false, "git_read": false, "git_write": false},
+  "contract": {
+    "answers": [
+      {"key": "is_breaking", "description": "Breaking change boolean.", "type": "bool", "strategy": "infer_from_diff"}
+    ],
+    "metadata_reads": [{"key": "gc.type", "description": "Prompt shown for feat/fix only.", "required": true}],
+    "metadata_writes": [{"key": "gc.breaking", "description": "Breaking change flag."}]
+  },
+  "ai_hints": {
+    "purpose": "Mark whether release has breaking impact.",
+    "instructions": "Set is_breaking=true only when API/behavior compatibility breaks."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/coauthors",
+  "name": "Co-authors",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-coauthors"]},
+  "hooks": ["collect", "finalize"],
+  "permissions": {"network": false, "git_read": true, "git_write": false},
+  "contract": {
+    "answers": [
+      {"key": "coauthors_selected", "description": "Array of co-author email ids.", "type": "[]string", "strategy": "infer_from_context"}
+    ],
+    "metadata_writes": [
+      {"key": "gc.coauthors", "description": "Co-author trailer values."},
+      {"key": "gc.coauthors_names", "description": "Co-author names."},
+      {"key": "gc.coauthors_emojis", "description": "Co-author emoji signature."}
+    ],
+    "metadata_reads": [
+      {"key": "gc.coauthors", "description": "Finalize trailers from selected co-authors."},
+      {"key": "gc.coauthors_emojis", "description": "Finalize emoji signature in body."}
+    ],
+    "trailer_writes": [{"key": "Co-authored-by", "description": "One trailer per selected co-author."}]
+  },
+  "ai_hints": {
+    "purpose": "Attach collaborator attribution.",
+    "instructions": "Set coauthors_selected to matching collaborator emails when pair/mob programming happened."
+  }
+}

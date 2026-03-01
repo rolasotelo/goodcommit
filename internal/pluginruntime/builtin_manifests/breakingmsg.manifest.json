@@ -1,0 +1,22 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/breakingmsg",
+  "name": "Breaking Message",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-breakingmsg"]},
+  "hooks": ["collect", "enrich"],
+  "permissions": {"network": false, "git_read": false, "git_write": false},
+  "contract": {
+    "answers": [
+      {"key": "breaking_message", "description": "Compatibility impact details.", "type": "string", "strategy": "infer_from_diff"}
+    ],
+    "metadata_reads": [{"key": "gc.breaking", "description": "Only active when breaking=true.", "required": true}],
+    "metadata_writes": [{"key": "gc.breaking_msg", "description": "Breaking details message."}]
+  },
+  "ai_hints": {
+    "purpose": "Provide explicit breaking change migration notes.",
+    "instructions": "Fill breaking_message only when is_breaking=true."
+  }
+}
