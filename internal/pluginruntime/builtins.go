@@ -45,47 +45,47 @@ var builtinSignedOffByManifest []byte
 
 var builtinRegistry = map[string]builtinDefinition{
 	"builtin/logo": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-logo"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-logo"},
 		ManifestRaw:   builtinLogoManifest,
 	},
 	"builtin/types": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-types"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-types"},
 		ManifestRaw:   builtinTypesManifest,
 	},
 	"builtin/scopes": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-scopes"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-scopes"},
 		ManifestRaw:   builtinScopesManifest,
 	},
 	"builtin/description": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-description"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-description"},
 		ManifestRaw:   builtinDescriptionManifest,
 	},
 	"builtin/why": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-why"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-why"},
 		ManifestRaw:   builtinWhyManifest,
 	},
 	"builtin/body": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-body"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-body"},
 		ManifestRaw:   builtinBodyManifest,
 	},
 	"builtin/breaking": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-breaking"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-breaking"},
 		ManifestRaw:   builtinBreakingManifest,
 	},
 	"builtin/breakingmsg": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-breakingmsg"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-breakingmsg"},
 		ManifestRaw:   builtinBreakingMsgManifest,
 	},
 	"builtin/coauthors": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-coauthors"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-coauthors"},
 		ManifestRaw:   builtinCoauthorsManifest,
 	},
 	"builtin/conventional-title": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-conventional-title"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-conventional-title"},
 		ManifestRaw:   builtinConventionalTitleManifest,
 	},
 	"builtin/signedoffby": {
-		DefaultSource: SourceConfig{Type: "path", Path: "./cmd/goodcommit-plugin-signedoffby"},
+		DefaultSource: SourceConfig{Type: "path", Path: "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-signedoffby"},
 		ManifestRaw:   builtinSignedOffByManifest,
 	},
 }

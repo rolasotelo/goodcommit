@@ -4,6 +4,7 @@ Goodcommit is a plugin-first tool for creating consistent commit messages.
 Usage:
 
 	goodcommit [flags]
+	goodcommit init [flags]
 	goodcommit plugin lock [flags]
 	goodcommit plugin verify [flags]
 	goodcommit plugin context [flags]
@@ -74,6 +75,14 @@ func (f *pluginAnswerFlag) Set(value string) error {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "init" {
+		if err := runInitSubcommand(os.Args[2:]); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "plugin" {
 		if err := runPluginSubcommand(os.Args[2:]); err != nil {
 			fmt.Println("Error:", err)
@@ -825,6 +834,166 @@ func cleanupRetryMessageFiles() {
 	}
 }
 
+func runInitSubcommand(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	pluginsConfigPath := fs.String("plugins-config", "./configs/goodcommit.plugins.json", "Path to write plugin config")
+	typesConfigPath := fs.String("types-config", "./configs/commit-types.json", "Path to write commit types config")
+	pluginsLockfilePath := fs.String("plugins-lockfile", "goodcommit.plugins.lock", "Path to write plugin lockfile")
+	force := fs.Bool("force", false, "Overwrite scaffold files if they already exist")
+	withLock := fs.Bool("lock", true, "Generate plugin lockfile after scaffolding")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return nil
+		}
+		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected args: %s", strings.Join(fs.Args(), " "))
+	}
+
+	configDir := filepath.Dir(*pluginsConfigPath)
+	typesConstraintPath, err := filepath.Rel(configDir, *typesConfigPath)
+	if err != nil {
+		typesConstraintPath = *typesConfigPath
+	}
+	typesConstraintPath = filepath.ToSlash(typesConstraintPath)
+
+	pluginsCfg := map[string]interface{}{
+		"plugins": []map[string]interface{}{
+			{
+				"id":      "builtin/types",
+				"enabled": true,
+				"ai_constraints": map[string]interface{}{
+					"commit_type": map[string]interface{}{
+						"allowed_values_from_json": map[string]interface{}{
+							"path":      typesConstraintPath,
+							"array_key": "types",
+							"value_key": "id",
+						},
+					},
+				},
+				"order":        10,
+				"failure_mode": "fail_closed",
+				"timeout_ms":   10000,
+				"config": map[string]interface{}{
+					"path": *typesConfigPath,
+				},
+			},
+			{
+				"id":           "builtin/description",
+				"enabled":      true,
+				"ui_group":     "compose_message",
+				"order":        30,
+				"failure_mode": "fail_closed",
+				"timeout_ms":   10000,
+				"config":       map[string]interface{}{},
+			},
+			{
+				"id":           "builtin/body",
+				"enabled":      true,
+				"ui_group":     "compose_message",
+				"order":        50,
+				"failure_mode": "fail_open",
+				"timeout_ms":   10000,
+				"config":       map[string]interface{}{},
+			},
+			{
+				"id":           "builtin/conventional-title",
+				"enabled":      true,
+				"order":        90,
+				"failure_mode": "fail_closed",
+				"timeout_ms":   10000,
+				"config":       map[string]interface{}{},
+			},
+		},
+	}
+	pluginsCfgRaw, err := json.MarshalIndent(pluginsCfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal plugins config: %w", err)
+	}
+	pluginsCfgRaw = append(pluginsCfgRaw, '\n')
+
+	typesCfg := map[string]interface{}{
+		"types": []map[string]interface{}{
+			{
+				"id":    "feat",
+				"name":  "Feat",
+				"title": "New commit introduces a new feature",
+				"emoji": "✨",
+			},
+			{
+				"id":    "fix",
+				"name":  "Fix",
+				"title": "This commit patches a bug",
+				"emoji": "🐞",
+			},
+			{
+				"id":    "chore",
+				"name":  "Chore",
+				"title": "For all other tasks",
+				"emoji": "🧰",
+			},
+		},
+	}
+	typesCfgRaw, err := json.MarshalIndent(typesCfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal types config: %w", err)
+	}
+	typesCfgRaw = append(typesCfgRaw, '\n')
+
+	created := []string{}
+	lockCreated := false
+	if err := writeScaffoldFile(*pluginsConfigPath, pluginsCfgRaw, *force); err != nil {
+		return err
+	}
+	created = append(created, *pluginsConfigPath)
+
+	if err := writeScaffoldFile(*typesConfigPath, typesCfgRaw, *force); err != nil {
+		return err
+	}
+	created = append(created, *typesConfigPath)
+
+	if *withLock {
+		resolved, err := plugins.LoadResolvedPlugins(*pluginsConfigPath)
+		if err != nil {
+			fmt.Printf("Warning: scaffold created but lock step failed to load plugins config: %v\n", err)
+		} else if lf, err := plugins.BuildLockfileWithArtifacts(resolved, *pluginsLockfilePath); err != nil {
+			fmt.Printf("Warning: scaffold created but lock step failed: %v\n", err)
+		} else if err := plugins.WriteLockfile(*pluginsLockfilePath, lf); err != nil {
+			fmt.Printf("Warning: scaffold created but lockfile write failed: %v\n", err)
+		} else {
+			created = append(created, *pluginsLockfilePath)
+			lockCreated = true
+		}
+	}
+
+	fmt.Println("Initialized goodcommit scaffold:")
+	for _, p := range created {
+		fmt.Printf("- %s\n", p)
+	}
+	if !*withLock || !lockCreated {
+		fmt.Println("Next: run `goodcommit plugin lock --plugins-config " + *pluginsConfigPath + " --plugins-lockfile " + *pluginsLockfilePath + "`")
+	}
+	return nil
+}
+
+func writeScaffoldFile(path string, content []byte, force bool) error {
+	if !force {
+		if _, err := os.Stat(path); err == nil {
+			return fmt.Errorf("%s already exists (use --force to overwrite)", path)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("stat %s: %w", path, err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create directory for %s: %w", path, err)
+	}
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
+}
+
 func runPluginSubcommand(args []string) error {
 	if len(args) == 0 {
 		return errors.New("expected one of: lock, verify, context")
@@ -836,6 +1005,9 @@ func runPluginSubcommand(args []string) error {
 		pluginsConfigPath := fs.String("plugins-config", "", "Path to a plugin configuration file")
 		pluginsLockfilePath := fs.String("plugins-lockfile", "goodcommit.plugins.lock", "Path to a plugin lockfile")
 		if err := fs.Parse(args[1:]); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if *pluginsConfigPath == "" {
@@ -859,6 +1031,9 @@ func runPluginSubcommand(args []string) error {
 		pluginsConfigPath := fs.String("plugins-config", "", "Path to a plugin configuration file")
 		pluginsLockfilePath := fs.String("plugins-lockfile", "goodcommit.plugins.lock", "Path to a plugin lockfile")
 		if err := fs.Parse(args[1:]); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if *pluginsConfigPath == "" {
@@ -878,6 +1053,9 @@ func runPluginSubcommand(args []string) error {
 		pluginsConfigPath := fs.String("plugins-config", "", "Path to a plugin configuration file")
 		pluginsLockfilePath := fs.String("plugins-lockfile", "goodcommit.plugins.lock", "Path to a plugin lockfile")
 		if err := fs.Parse(args[1:]); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if *pluginsConfigPath == "" {

@@ -58,11 +58,8 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 	}
 	artifactPath := filepath.Join(binDir, artifactName)
 
-	cmd := exec.Command("go", "build", "-o", artifactPath, target)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", "", fmt.Errorf("build plugin %s: %w stderr=%s", rp.Runtime.Manifest.ID, err, strings.TrimSpace(stderr.String()))
+	if err := buildPluginArtifact(artifactPath, target); err != nil {
+		return "", "", fmt.Errorf("build plugin %s: %w", rp.Runtime.Manifest.ID, err)
 	}
 
 	sum, err := FileSHA256(artifactPath)
@@ -74,6 +71,74 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 		return "", "", fmt.Errorf("relative path for plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
 	}
 	return filepath.ToSlash(rel), sum, nil
+}
+
+func buildPluginArtifact(artifactPath, target string) error {
+	stderr, err := runGoBuild("", artifactPath, target)
+	if err == nil {
+		return nil
+	}
+	if isModuleImportTarget(target) && isMissingGoModuleContext(stderr) {
+		tempStderr, tempErr := buildInTempModule(artifactPath, target)
+		if tempErr == nil {
+			return nil
+		}
+		return fmt.Errorf("%w stderr=%s (fallback stderr=%s)", err, strings.TrimSpace(stderr), strings.TrimSpace(tempStderr))
+	}
+	return fmt.Errorf("%w stderr=%s", err, strings.TrimSpace(stderr))
+}
+
+func runGoBuild(dir, artifactPath, target string) (string, error) {
+	cmd := exec.Command("go", "build", "-o", artifactPath, target)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stderr.String(), err
+}
+
+func buildInTempModule(artifactPath, target string) (string, error) {
+	tempDir, err := os.MkdirTemp("", "goodcommit-plugin-build-*")
+	if err != nil {
+		return "", fmt.Errorf("create temp module dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cmdInit := exec.Command("go", "mod", "init", "goodcommit-temp-build")
+	cmdInit.Dir = tempDir
+	var initErr bytes.Buffer
+	cmdInit.Stderr = &initErr
+	if err := cmdInit.Run(); err != nil {
+		return initErr.String(), fmt.Errorf("init temp module: %w", err)
+	}
+
+	cmdGet := exec.Command("go", "get", target+"@latest")
+	cmdGet.Dir = tempDir
+	var getErr bytes.Buffer
+	cmdGet.Stderr = &getErr
+	if err := cmdGet.Run(); err != nil {
+		return getErr.String(), fmt.Errorf("resolve module target: %w", err)
+	}
+
+	buildErr, err := runGoBuild(tempDir, artifactPath, target)
+	if err != nil {
+		return buildErr, err
+	}
+	return "", nil
+}
+
+func isModuleImportTarget(target string) bool {
+	target = strings.TrimSpace(target)
+	return target != "" &&
+		!strings.HasPrefix(target, ".") &&
+		!strings.HasPrefix(target, "/") &&
+		strings.Contains(target, ".")
+}
+
+func isMissingGoModuleContext(stderr string) bool {
+	return strings.Contains(stderr, "go.mod file not found in current directory or any parent directory")
 }
 
 func buildTarget(rp ResolvedPlugin) string {
