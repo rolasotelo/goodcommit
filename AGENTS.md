@@ -26,6 +26,13 @@ go test ./...
 go build ./...
 ```
 
+If changes touch plugin manifests/configs/runtime resolution, also run:
+
+```bash
+go run ./cmd/goodcommit plugin lock --plugins-config ./configs/goodcommit.plugins.json --plugins-lockfile ./goodcommit.plugins.lock
+go run ./cmd/goodcommit plugin verify --plugins-config ./configs/goodcommit.plugins.json --plugins-lockfile ./goodcommit.plugins.lock
+```
+
 ## Commit Quality Rules
 
 - Commit message must reflect actual staged diff.

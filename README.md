@@ -1,27 +1,90 @@
 # Goodcommit
 
-A CLI tool to help streamline writing good and useful commit messages. The spark that originated this idea was the realization that traditional commit messages often focus on what changed, but they rarely capture the reasoning behind the change, so I decided to create a tool that would help me (for me to) write better commit messages.
+Goodcommit is a plugin-first CLI for generating structured, consistent commit messages.
 
-## Why Goodcommit?
+It runs a configurable plugin pipeline across commit phases (`collect`, `enrich`, `finalize`, etc.), then composes the final message and executes `git commit`.
 
-Git excels at preserving what has changed in a codebase, but it needs a little help to capture the reasoning behind these changes. Goodcommit aims to bridge this gap by:
+## Quick Start
 
-- Encouraging developers to think about the context and motivation behind their changes
-- Providing structured templates that guide better commit message writing
-- Ensuring consistency across team members and projects
-- Making code history more valuable for future developers (including yourself)
+1. Lock plugins:
 
-It you allow me to sound grandiose, the goal is to transform commit messages from simple change logs into meaningful documentation of your development decisions.
+```bash
+go run ./cmd/goodcommit plugin lock \
+  --plugins-config ./configs/goodcommit.plugins.json \
+  --plugins-lockfile ./goodcommit.plugins.lock
+```
 
-## Overview
+2. Verify lockfile:
 
-In essence, Goodcommit is a customizable commit message builder that ensures your commit messages follow best practices and are consistent across your projects. It is written in Go and uses [Charm](https://charm.land) packages for the CLI interface.
+```bash
+go run ./cmd/goodcommit plugin verify \
+  --plugins-config ./configs/goodcommit.plugins.json \
+  --plugins-lockfile ./goodcommit.plugins.lock
+```
 
-## Features
+3. Run interactively:
 
-- **Interactive Interface**: Beautiful CLI interface built with [Charm](https://charm.land) packages
-- **Customizable**: Allow users to define and use their own plugins in addition to the built-in ones
+```bash
+go run ./cmd/goodcommit
+```
+
+4. Dry run (no commit):
+
+```bash
+go run ./cmd/goodcommit -m
+```
+
+## Default Built-in Flow
+
+Current default stack (from `configs/goodcommit.plugins.json`):
+
+- `builtin/logo`
+- `builtin/types`
+- `builtin/scopes`
+- `builtin/description`
+- `builtin/why`
+- `builtin/body`
+- `builtin/breaking`
+- `builtin/breakingmsg`
+- `builtin/coauthors`
+- `builtin/conventional-title`
+- `builtin/signedoffby`
+
+Notes:
+
+- `logo` and `types` share one grouped page (`ui_group: "intro"`).
+- Grouped UI is compact by default.
+- Use `--detailed-ui` (or `GOODCOMMIT_DETAILED_UI=true`) to show verbose grouped section headings/instructions.
+
+## Non-Interactive Usage
+
+You can provide answers via `--plugin-answer`:
+
+```bash
+go run ./cmd/goodcommit \
+  --plugin-answer commit_type=feat \
+  --plugin-answer commit_description="add plugin lock verification" \
+  -m
+```
+
+To inspect required/optional answers for automation/agents:
+
+```bash
+go run ./cmd/goodcommit plugin context \
+  --plugins-config ./configs/goodcommit.plugins.json \
+  --plugins-lockfile ./goodcommit.plugins.lock
+```
+
+## Config Notes
+
+- Main plugin config: `configs/goodcommit.plugins.json`
+- Example config: `configs/plugins-config.example.json`
+- Default logo file: `configs/logo.ascii.txt`
+- Scope options file: `configs/commit-scopes.json`
+- Co-author options file: `configs/commit-coauthors.json`
+
+Built-in plugins can omit explicit `manifest`/`source` in config; runtime resolves them from embedded built-in definitions.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT. See `LICENSE`.
