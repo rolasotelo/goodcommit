@@ -1,0 +1,18 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/signedoffby",
+  "name": "Signed-off-by",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-signedoffby"]},
+  "hooks": ["finalize"],
+  "permissions": {"network": false, "git_read": true, "git_write": false},
+  "contract": {
+    "trailer_writes": [{"key": "Signed-off-by", "description": "Author sign-off trailer."}]
+  },
+  "ai_hints": {
+    "purpose": "Add Signed-off-by trailer from git identity.",
+    "instructions": "No direct answers required."
+  }
+}

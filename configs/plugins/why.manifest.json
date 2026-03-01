@@ -1,0 +1,22 @@
+{
+  "api_version": "goodcommit.io/v1",
+  "kind": "Plugin",
+  "id": "builtin/why",
+  "name": "Why",
+  "version": "1.0.0",
+  "protocol_versions": ["1.0"],
+  "entrypoint": {"type": "exec", "command": "go", "args": ["run", "./cmd/goodcommit-plugin-why"]},
+  "hooks": ["collect", "enrich"],
+  "permissions": {"network": false, "git_read": false, "git_write": false},
+  "contract": {
+    "answers": [
+      {"key": "commit_why", "description": "Reason this change exists.", "type": "string", "strategy": "infer_from_diff"}
+    ],
+    "metadata_writes": [{"key": "gc.why", "description": "Normalized rationale text."}],
+    "metadata_reads": [{"key": "gc.why", "description": "Used to prepend WHY section."}]
+  },
+  "ai_hints": {
+    "purpose": "Add rationale context to commit body.",
+    "instructions": "Set commit_why to user-impact or technical motivation."
+  }
+}

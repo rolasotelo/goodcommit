@@ -11,6 +11,7 @@ Usage:
 Flags:
 
 	--accessible           Enable accessible mode for forms
+	--detailed-ui          Show detailed grouped plugin headings/instructions
 	--message              Use an initial commit message before plugin phases
 	--plugins-config       Path to a plugin configuration file
 	--plugins-lockfile     Path to a plugin lockfile (default: goodcommit.plugins.lock)
@@ -104,6 +105,8 @@ func main() {
 
 	accessible, _ := strconv.ParseBool(os.Getenv("ACCESSIBLE"))
 	flag.BoolVar(&accessible, "accessible", accessible, "Enable accessible mode")
+	detailedUI, _ := strconv.ParseBool(os.Getenv("GOODCOMMIT_DETAILED_UI"))
+	flag.BoolVar(&detailedUI, "detailed-ui", detailedUI, "Show detailed grouped plugin headings/instructions")
 
 	dryRun := flag.Bool("m", false, "Dry run mode, do not execute commit")
 	retry := flag.Bool("retry", false, "Retry commit with the last saved commit message")
@@ -202,7 +205,7 @@ func main() {
 	runner := plugins.NewRunner()
 	runner.PromptHandler = makePromptResolver(pluginAnswers, autoAnswersByPlugin, accessible)
 	runner.UIHandler = makeUIResolver(pluginAnswers, autoAnswersByPlugin, accessible)
-	runner.GroupedUIHandler = makeGroupedUIResolver(pluginAnswers, autoAnswersByPlugin, accessible)
+	runner.GroupedUIHandler = makeGroupedUIResolver(pluginAnswers, autoAnswersByPlugin, accessible, detailedUI)
 	runner.AllowPluginNetwork = *allowPluginNetwork
 	runner.AllowPluginGitWrite = *allowPluginGitWrite
 	runner.AllowFilesystemWrite = *allowPluginFilesystemWrite
@@ -297,9 +300,9 @@ func makeUIResolver(predefined map[string]string, autoByPlugin map[string]map[st
 	}
 }
 
-func makeGroupedUIResolver(predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) plugins.GroupedUIHandler {
+func makeGroupedUIResolver(predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool, detailed bool) plugins.GroupedUIHandler {
 	return func(groupID string, requests []plugins.PluginUIBatchRequest) (map[string]map[string]interface{}, error) {
-		return resolveGroupedUIRequests(groupID, requests, predefined, autoByPlugin, accessible)
+		return resolveGroupedUIRequests(groupID, requests, predefined, autoByPlugin, accessible, detailed)
 	}
 }
 
@@ -430,7 +433,7 @@ func resolveUIRequests(pluginID string, forms []plugins.UIRequest, predefined ma
 	return answers, nil
 }
 
-func resolveGroupedUIRequests(groupID string, requests []plugins.PluginUIBatchRequest, predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool) (map[string]map[string]interface{}, error) {
+func resolveGroupedUIRequests(groupID string, requests []plugins.PluginUIBatchRequest, predefined map[string]string, autoByPlugin map[string]map[string]interface{}, accessible bool, detailed bool) (map[string]map[string]interface{}, error) {
 	answersByPlugin := map[string]map[string]interface{}{}
 	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
 
@@ -480,23 +483,30 @@ func resolveGroupedUIRequests(groupID string, requests []plugins.PluginUIBatchRe
 
 	for _, req := range requests {
 		for _, ui := range req.Forms {
-			sectionTitle := ui.Title
-			if strings.TrimSpace(sectionTitle) == "" {
-				sectionTitle = ui.ID
+			if detailed {
+				sectionTitle := ui.Title
+				if strings.TrimSpace(sectionTitle) == "" {
+					sectionTitle = ui.ID
+				}
+				sectionDesc := ui.Description
+				if sectionDesc == "" {
+					sectionDesc = "Fill required fields and submit."
+				}
+				fields = append(fields, huh.NewNote().Title(fmt.Sprintf("%s - %s", req.PluginID, sectionTitle)).Description(sectionDesc))
 			}
-			sectionDesc := ui.Description
-			if sectionDesc == "" {
-				sectionDesc = "Fill required fields and submit."
-			}
-			fields = append(fields, huh.NewNote().Title(fmt.Sprintf("%s - %s", req.PluginID, sectionTitle)).Description(sectionDesc))
 
+			firstPromptField := true
 			for _, f := range ui.Fields {
+				fieldDesc := f.Description
+				if !detailed && firstPromptField && f.Type != "note" && strings.TrimSpace(fieldDesc) == "" {
+					fieldDesc = strings.TrimSpace(ui.Description)
+				}
 				switch f.Type {
 				case "note":
-					fields = append(fields, huh.NewNote().Title(f.Title).Description(f.Description))
+					fields = append(fields, huh.NewNote().Title(f.Title).Description(fieldDesc))
 				case "input":
 					v := f.Value
-					input := huh.NewInput().Title(f.Title).Description(f.Description).Placeholder(f.Placeholder).Value(&v)
+					input := huh.NewInput().Title(f.Title).Description(fieldDesc).Placeholder(f.Placeholder).Value(&v)
 					if f.CharLimit > 0 {
 						input = input.CharLimit(f.CharLimit)
 					}
@@ -510,34 +520,39 @@ func resolveGroupedUIRequests(groupID string, requests []plugins.PluginUIBatchRe
 					}
 					fields = append(fields, input)
 					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+					firstPromptField = false
 				case "text":
 					v := f.Value
-					text := huh.NewText().Title(f.Title).Description(f.Description).Placeholder(f.Placeholder).Value(&v)
+					text := huh.NewText().Title(f.Title).Description(fieldDesc).Placeholder(f.Placeholder).Value(&v)
 					if f.Editor {
 						text = text.Editor("vim")
 					}
 					fields = append(fields, text)
 					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+					firstPromptField = false
 				case "confirm":
 					var v bool
-					fields = append(fields, huh.NewConfirm().Title(f.Title).Description(f.Description).Value(&v))
+					fields = append(fields, huh.NewConfirm().Title(f.Title).Description(fieldDesc).Value(&v))
 					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+					firstPromptField = false
 				case "select":
 					opts := make([]huh.Option[string], 0, len(f.Options))
 					for _, o := range f.Options {
 						opts = append(opts, huh.NewOption(o.Label, o.Value))
 					}
 					v := ""
-					fields = append(fields, huh.NewSelect[string]().Title(f.Title).Description(f.Description).Options(opts...).Value(&v))
+					fields = append(fields, huh.NewSelect[string]().Title(f.Title).Description(fieldDesc).Options(opts...).Value(&v))
 					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+					firstPromptField = false
 				case "multiselect":
 					opts := make([]huh.Option[string], 0, len(f.Options))
 					for _, o := range f.Options {
 						opts = append(opts, huh.NewOption(o.Label, o.Value))
 					}
 					v := []string{}
-					fields = append(fields, huh.NewMultiSelect[string]().Title(f.Title).Description(f.Description).Options(opts...).Value(&v))
+					fields = append(fields, huh.NewMultiSelect[string]().Title(f.Title).Description(fieldDesc).Options(opts...).Value(&v))
 					local = append(local, localFieldRef{pluginID: req.PluginID, fieldID: f.ID, ref: &v})
+					firstPromptField = false
 				default:
 					return nil, fmt.Errorf("plugin %s field %s.%s has unsupported type %q", req.PluginID, ui.ID, f.ID, f.Type)
 				}
