@@ -30,19 +30,20 @@ type SourceConfig struct {
 
 // PluginConfig is one plugin entry in plugins config file.
 type PluginConfig struct {
-	ID                   string                 `json:"id"`
-	Enabled              bool                   `json:"enabled"`
-	Manifest             string                 `json:"manifest"`
-	Source               SourceConfig           `json:"source"`
-	UIGroup              string                 `json:"ui_group,omitempty"`
-	Order                int                    `json:"order"`
-	FailureMode          FailureMode            `json:"failure_mode"`
-	TimeoutMS            int                    `json:"timeout_ms"`
-	Config               map[string]interface{} `json:"config,omitempty"`
-	AIAuto               map[string]interface{} `json:"ai_auto_answers,omitempty"`
-	AIInstructionsAppend string                 `json:"ai_instructions_append,omitempty"`
-	Hooks                []HookPhase            `json:"hooks,omitempty"`    // deprecated/unsupported override
-	AIHints              *api.AIHints           `json:"ai_hints,omitempty"` // deprecated/unsupported override
+	ID                   string                        `json:"id"`
+	Enabled              bool                          `json:"enabled"`
+	Manifest             string                        `json:"manifest"`
+	Source               SourceConfig                  `json:"source"`
+	AIConstraints        map[string]AIAnswerConstraint `json:"ai_constraints,omitempty"`
+	UIGroup              string                        `json:"ui_group,omitempty"`
+	Order                int                           `json:"order"`
+	FailureMode          FailureMode                   `json:"failure_mode"`
+	TimeoutMS            int                           `json:"timeout_ms"`
+	Config               map[string]interface{}        `json:"config,omitempty"`
+	AIAuto               map[string]interface{}        `json:"ai_auto_answers,omitempty"`
+	AIInstructionsAppend string                        `json:"ai_instructions_append,omitempty"`
+	Hooks                []HookPhase                   `json:"hooks,omitempty"`    // deprecated/unsupported override
+	AIHints              *api.AIHints                  `json:"ai_hints,omitempty"` // deprecated/unsupported override
 }
 
 // ResolvedPlugin carries runtime data and source/manifest metadata.
@@ -136,14 +137,15 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 		}
 
 		rp := RuntimePlugin{
-			Manifest:    manifest,
-			Config:      p.Config,
-			AIHints:     aiHints,
-			AIAuto:      p.AIAuto,
-			UIGroup:     strings.TrimSpace(p.UIGroup),
-			Order:       p.Order,
-			FailureMode: p.FailureMode,
-			Timeout:     timeout,
+			Manifest:      manifest,
+			Config:        p.Config,
+			AIHints:       aiHints,
+			AIAuto:        p.AIAuto,
+			AIConstraints: resolveAIConstraints(baseDir, p.AIConstraints),
+			UIGroup:       strings.TrimSpace(p.UIGroup),
+			Order:         p.Order,
+			FailureMode:   p.FailureMode,
+			Timeout:       timeout,
 		}
 
 		resolved = append(resolved, ResolvedPlugin{
@@ -165,6 +167,25 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 	}
 
 	return resolved, nil
+}
+
+func resolveAIConstraints(baseDir string, in map[string]AIAnswerConstraint) map[string]AIAnswerConstraint {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]AIAnswerConstraint, len(in))
+	for key, c := range in {
+		clone := AIAnswerConstraint{
+			AllowedValues: append([]string(nil), c.AllowedValues...),
+		}
+		if c.AllowedValuesFromJSON != nil {
+			src := *c.AllowedValuesFromJSON
+			src.Path = resolvePath(baseDir, src.Path)
+			clone.AllowedValuesFromJSON = &src
+		}
+		out[key] = clone
+	}
+	return out
 }
 
 func validateUIGroupContiguity(resolved []ResolvedPlugin) error {

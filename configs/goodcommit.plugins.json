@@ -3,6 +3,15 @@
     {
       "id": "builtin/types",
       "enabled": true,
+      "ai_constraints": {
+        "commit_type": {
+          "allowed_values_from_json": {
+            "path": "./commit-types.json",
+            "array_key": "types",
+            "value_key": "id"
+          }
+        }
+      },
       "order": 1,
       "failure_mode": "fail_closed",
       "timeout_ms": 10000,

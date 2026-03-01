@@ -154,6 +154,7 @@ Key ideas:
 
 - Enable/disable per plugin.
 - Optional `ui_group` to render multiple plugins' forms on one page (plugins with same group and contiguous order in a phase).
+- Optional `ai_constraints` to expose allowed values for answer keys (including extraction from project JSON config files).
 - Per-plugin runtime config blob (`config`) consumed by the plugin executable.
 - Per-plugin timeout and failure mode.
 - Optional `ai_instructions_append` and `ai_auto_answers` for local agent behavior.

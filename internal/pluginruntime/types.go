@@ -54,16 +54,30 @@ type Permissions = api.Permissions
 
 type Manifest = api.Manifest
 
+// AIValuesFromJSON describes how to extract allowed values from a JSON file.
+type AIValuesFromJSON struct {
+	Path     string `json:"path"`
+	ArrayKey string `json:"array_key,omitempty"`
+	ValueKey string `json:"value_key,omitempty"`
+}
+
+// AIAnswerConstraint narrows acceptable values for one answer key.
+type AIAnswerConstraint struct {
+	AllowedValues         []string          `json:"allowed_values,omitempty"`
+	AllowedValuesFromJSON *AIValuesFromJSON `json:"allowed_values_from_json,omitempty"`
+}
+
 // RuntimePlugin configures execution details for one enabled plugin instance.
 type RuntimePlugin struct {
-	Manifest    Manifest
-	Config      map[string]interface{}
-	AIHints     *api.AIHints
-	AIAuto      map[string]interface{}
-	UIGroup     string
-	Order       int
-	FailureMode FailureMode
-	Timeout     time.Duration
+	Manifest      Manifest
+	Config        map[string]interface{}
+	AIHints       *api.AIHints
+	AIAuto        map[string]interface{}
+	AIConstraints map[string]AIAnswerConstraint
+	UIGroup       string
+	Order         int
+	FailureMode   FailureMode
+	Timeout       time.Duration
 }
 
 // Invocation captures details from a plugin execution.

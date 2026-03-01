@@ -875,7 +875,10 @@ func runPluginSubcommand(args []string) error {
 		if err := plugins.VerifyResolvedPlugins(resolved, *pluginsLockfilePath); err != nil {
 			return err
 		}
-		contextPayload := plugins.BuildAIContext(resolved)
+		contextPayload, err := plugins.BuildAIContext(resolved)
+		if err != nil {
+			return err
+		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(contextPayload)
