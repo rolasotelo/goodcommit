@@ -78,7 +78,7 @@ func buildPluginArtifact(artifactPath, target string) error {
 	if err == nil {
 		return nil
 	}
-	if isModuleImportTarget(target) && isMissingGoModuleContext(stderr) {
+	if isModuleImportTarget(target) {
 		tempStderr, tempErr := buildInTempModule(artifactPath, target)
 		if tempErr == nil {
 			return nil
@@ -135,10 +135,6 @@ func isModuleImportTarget(target string) bool {
 		!strings.HasPrefix(target, ".") &&
 		!strings.HasPrefix(target, "/") &&
 		strings.Contains(target, ".")
-}
-
-func isMissingGoModuleContext(stderr string) bool {
-	return strings.Contains(stderr, "go.mod file not found in current directory or any parent directory")
 }
 
 func buildTarget(rp ResolvedPlugin) string {
