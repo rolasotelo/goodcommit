@@ -106,6 +106,19 @@ goodcommit plugin context \
 
 Built-in plugins can omit explicit `manifest`/`source` in config; runtime resolves them from embedded built-in definitions.
 
+You can force specific plugin answer keys to be mandatory via `required_answers` on that plugin config entry. Example:
+
+```json
+{
+  "id": "builtin/body",
+  "required_answers": ["commit_body"]
+}
+```
+
+This affects both:
+- `goodcommit plugin context` output (`commit_body` will move to `required_answers`)
+- Runtime execution (plugin invocation fails if required answers are still missing/empty, even when that plugin uses `fail_open`)
+
 ## `init` Flags
 
 ```bash

@@ -2,6 +2,8 @@ package pluginruntime
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +13,7 @@ import (
 )
 
 const projectBinDir = ".goodcommit/plugins/bin"
+const gobinLockPrefix = "gobin:"
 
 // BuildLockfileWithArtifacts writes lock metadata plus locally built plugin executables.
 func BuildLockfileWithArtifacts(resolved []ResolvedPlugin, lockPath, binDirOverride string) (Lockfile, error) {
@@ -60,6 +63,9 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 	}
 
 	artifactName := sanitizePluginID(rp.Runtime.Manifest.ID)
+	if suffix := artifactNameSuffix(rp); suffix != "" {
+		artifactName += "-" + suffix
+	}
 	if goruntime.GOOS == "windows" {
 		artifactName += ".exe"
 	}
@@ -69,7 +75,7 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 		return "", "", fmt.Errorf("resolve plugin artifact path %s: %w", artifactPath, err)
 	}
 
-	if err := buildPluginArtifact(artifactPath, target); err != nil {
+	if err := buildPluginArtifact(artifactPath, target, moduleRefForBuild(rp)); err != nil {
 		return "", "", fmt.Errorf("build plugin %s: %w", rp.Runtime.Manifest.ID, err)
 	}
 
@@ -77,20 +83,20 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 	if err != nil {
 		return "", "", fmt.Errorf("checksum plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
 	}
-	storedPath, err := pathForLockfile(lockDir, artifactPath)
+	storedPath, err := pathForLockfile(lockDir, binDir, artifactPath)
 	if err != nil {
 		return "", "", fmt.Errorf("path for plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
 	}
 	return storedPath, sum, nil
 }
 
-func buildPluginArtifact(artifactPath, target string) error {
+func buildPluginArtifact(artifactPath, target, moduleRef string) error {
 	stderr, err := runGoBuild("", artifactPath, target)
 	if err == nil {
 		return nil
 	}
 	if isModuleImportTarget(target) {
-		tempStderr, tempErr := buildInTempModule(artifactPath, target)
+		tempStderr, tempErr := buildInTempModule(artifactPath, target, moduleRef)
 		if tempErr == nil {
 			return nil
 		}
@@ -110,7 +116,12 @@ func runGoBuild(dir, artifactPath, target string) (string, error) {
 	return stderr.String(), err
 }
 
-func buildInTempModule(artifactPath, target string) (string, error) {
+func buildInTempModule(artifactPath, target, moduleRef string) (string, error) {
+	moduleRef = strings.TrimSpace(moduleRef)
+	if moduleRef == "" {
+		return "", fmt.Errorf("deterministic module ref required for %s (set source.ref)", target)
+	}
+
 	tempDir, err := os.MkdirTemp("", "goodcommit-plugin-build-*")
 	if err != nil {
 		return "", fmt.Errorf("create temp module dir: %w", err)
@@ -125,7 +136,7 @@ func buildInTempModule(artifactPath, target string) (string, error) {
 		return initErr.String(), fmt.Errorf("init temp module: %w", err)
 	}
 
-	cmdGet := exec.Command("go", "get", target+"@latest")
+	cmdGet := exec.Command("go", "get", target+"@"+moduleRef)
 	cmdGet.Dir = tempDir
 	var getErr bytes.Buffer
 	cmdGet.Stderr = &getErr
@@ -196,7 +207,7 @@ func discoverGoBin() (string, error) {
 	return filepath.Join(home, "go", "bin"), nil
 }
 
-func pathForLockfile(lockDir, artifactPath string) (string, error) {
+func pathForLockfile(lockDir, binDir, artifactPath string) (string, error) {
 	rel, err := filepath.Rel(lockDir, artifactPath)
 	if err == nil {
 		isOutside := rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator))
@@ -204,6 +215,13 @@ func pathForLockfile(lockDir, artifactPath string) (string, error) {
 			return filepath.ToSlash(rel), nil
 		}
 	}
+
+	if samePath(binDir, artifactPath) || pathWithin(binDir, artifactPath) {
+		if gobin, gobinErr := discoverGoBin(); gobinErr == nil && samePath(gobin, binDir) {
+			return gobinLockPrefix + filepath.ToSlash(filepath.Base(artifactPath)), nil
+		}
+	}
+
 	return filepath.ToSlash(artifactPath), nil
 }
 
@@ -228,4 +246,82 @@ func buildTarget(rp ResolvedPlugin) string {
 func sanitizePluginID(id string) string {
 	replacer := strings.NewReplacer("/", "-", "\\", "-", ":", "-", " ", "-", "@", "-")
 	return replacer.Replace(id)
+}
+
+func artifactNameSuffix(rp ResolvedPlugin) string {
+	if sum := strings.TrimSpace(rp.ManifestSHA); sum != "" {
+		sum = strings.TrimPrefix(strings.ToLower(sum), "sha256:")
+		sum = normalizeAlphaNum(sum)
+		if len(sum) >= 12 {
+			return sum[:12]
+		}
+		return sum
+	}
+	seed := strings.TrimSpace(strings.Join([]string{
+		rp.Runtime.Manifest.Version,
+		rp.Source.Type,
+		rp.Source.Repo,
+		rp.Source.Ref,
+		rp.Source.Path,
+		rp.Source.Checksum,
+	}, "|"))
+	if seed == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(seed))
+	return hex.EncodeToString(sum[:])[:12]
+}
+
+func normalizeAlphaNum(in string) string {
+	var b strings.Builder
+	for _, r := range in {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func moduleRefForBuild(rp ResolvedPlugin) string {
+	if ref := strings.TrimSpace(rp.Source.Ref); ref != "" {
+		return ref
+	}
+	if _, isBuiltin := builtinByID(rp.Runtime.Manifest.ID); isBuiltin {
+		if ref := builtinSourceRef(); ref != "" {
+			return ref
+		}
+	}
+	return ""
+}
+
+func samePath(a, b string) bool {
+	aAbs, aErr := filepath.Abs(a)
+	bAbs, bErr := filepath.Abs(b)
+	if aErr != nil || bErr != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	if goruntime.GOOS == "windows" {
+		return strings.EqualFold(filepath.Clean(aAbs), filepath.Clean(bAbs))
+	}
+	return filepath.Clean(aAbs) == filepath.Clean(bAbs)
+}
+
+func pathWithin(base, target string) bool {
+	if strings.TrimSpace(base) == "" || strings.TrimSpace(target) == "" {
+		return false
+	}
+	baseAbs, err := filepath.Abs(base)
+	if err != nil {
+		return false
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(baseAbs, targetAbs)
+	if err != nil {
+		return false
+	}
+	isOutside := rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+	return !isOutside
 }

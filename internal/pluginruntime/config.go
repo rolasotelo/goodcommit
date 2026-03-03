@@ -34,6 +34,7 @@ type PluginConfig struct {
 	Enabled              bool                          `json:"enabled"`
 	Manifest             string                        `json:"manifest"`
 	Source               SourceConfig                  `json:"source"`
+	RequiredAnswers      []string                      `json:"required_answers,omitempty"`
 	AIConstraints        map[string]AIAnswerConstraint `json:"ai_constraints,omitempty"`
 	UIGroup              string                        `json:"ui_group,omitempty"`
 	Order                int                           `json:"order"`
@@ -115,6 +116,11 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 		if p.Source.Type == "" && isBuiltin {
 			p.Source = builtinDef.DefaultSource
 		}
+		if isBuiltin && strings.TrimSpace(p.Source.Ref) == "" {
+			if ref := builtinSourceRef(); ref != "" {
+				p.Source.Ref = ref
+			}
+		}
 		if p.Source.Type == "" && p.Source.Path != "" {
 			p.Source.Type = "path"
 		}
@@ -123,6 +129,10 @@ func LoadResolvedPlugins(configPath string) ([]ResolvedPlugin, error) {
 		}
 		if p.AIHints != nil {
 			return nil, fmt.Errorf("plugin %q: overriding manifest ai_hints from config is not allowed (use ai_instructions_append)", manifest.ID)
+		}
+		manifest, err = applyRequiredAnswerOverrides(manifest, p.RequiredAnswers)
+		if err != nil {
+			return nil, fmt.Errorf("plugin %q required_answers: %w", manifest.ID, err)
 		}
 		aiHints := manifest.AIHints
 		if strings.TrimSpace(p.AIInstructionsAppend) != "" {
