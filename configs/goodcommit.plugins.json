@@ -66,6 +66,7 @@
       "id": "builtin/body",
       "enabled": true,
       "ui_group": "compose_message",
+      "required_answers": ["commit_body"],
       "order": 50,
       "failure_mode": "fail_open",
       "timeout_ms": 10000,

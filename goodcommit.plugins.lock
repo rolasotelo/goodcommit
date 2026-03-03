@@ -9,8 +9,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-body"
       },
       "manifest_checksum": "sha256:3b3a424abac399f7181c8bdd6b5320836c1f07a990c938bf6ff699df2aba3fe8",
-      "executable_path": ".goodcommit/plugins/bin/builtin-body",
-      "executable_checksum": "sha256:7446d6085b9ad1e94cc774cedc59a9e40a93e7432069feb4a1bda9de4ac2cac3",
+      "executable_path": "gobin:builtin-body-3b3a424abac3",
+      "executable_checksum": "sha256:2aa55bc258d3b1b2ece3c5780b980e5e28c4990a8e5bb9f0780b7b12fc12cfde",
       "hooks": [
         "collect"
       ],
@@ -27,11 +27,12 @@
             "key": "commit_body",
             "description": "Detailed body content.",
             "type": "string",
+            "required": true,
             "strategy": "infer_from_diff"
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/breaking",
@@ -41,8 +42,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-breaking"
       },
       "manifest_checksum": "sha256:ccb7ee6066475ce45a51e7a04eb3686badd3a5ea6fdd209d9110db998209a6f3",
-      "executable_path": ".goodcommit/plugins/bin/builtin-breaking",
-      "executable_checksum": "sha256:87ddcf913033096f2a622e7dbb9a3ce07bd3dd31fb9971fba0ed6c0d24e7dfbc",
+      "executable_path": "gobin:builtin-breaking-ccb7ee606647",
+      "executable_checksum": "sha256:309a63559860e8f1367a6c22745b9d153583b1a66b09da02eb4a578d7f3228aa",
       "hooks": [
         "collect"
       ],
@@ -79,7 +80,7 @@
       "ai_auto_answers": {
         "is_breaking": false
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/breakingmsg",
@@ -89,8 +90,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-breakingmsg"
       },
       "manifest_checksum": "sha256:21421a65e8a988a2625ab1e198e24f5f80b332d000d422af3f6121946a4882c2",
-      "executable_path": ".goodcommit/plugins/bin/builtin-breakingmsg",
-      "executable_checksum": "sha256:f9945b704cc4e1a8429eec240592b433e8c5d89a7e6e06ba09e548d780730cc3",
+      "executable_path": "gobin:builtin-breakingmsg-21421a65e8a9",
+      "executable_checksum": "sha256:dd6bac207629ec2e40df6f9baed163e340a4b3f7195db071da102780a807e4ea",
       "hooks": [
         "collect",
         "enrich"
@@ -125,7 +126,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/coauthors",
@@ -135,8 +136,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-coauthors"
       },
       "manifest_checksum": "sha256:ab995a805c5813846bdbec444cd02ccab322977dcb8435e39cebe34948150a5c",
-      "executable_path": ".goodcommit/plugins/bin/builtin-coauthors",
-      "executable_checksum": "sha256:1d2a9b593175e025934a9f1639dc80521b4a80df4c7cf93191ccd170cc21dce2",
+      "executable_path": "gobin:builtin-coauthors-ab995a805c58",
+      "executable_checksum": "sha256:5f6cf5c9f52c21d96d7341b61c5f8cc8694c78cd8a5efb3cadc27862069e4b92",
       "hooks": [
         "collect",
         "finalize"
@@ -191,7 +192,7 @@
       "ai_auto_answers": {
         "coauthors_selected": []
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/conventional-title",
@@ -201,8 +202,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-conventional-title"
       },
       "manifest_checksum": "sha256:daff04b494a2d6baddec4df923c2c0826fe002314364b884772897dd053069f0",
-      "executable_path": ".goodcommit/plugins/bin/builtin-conventional-title",
-      "executable_checksum": "sha256:945066e92a3c040d79cd4a6a09515d0f0fc112be98b9e0ce3fc2d1df86174a00",
+      "executable_path": "gobin:builtin-conventional-title-daff04b494a2",
+      "executable_checksum": "sha256:a4e681ad28bd11328ac86cec428713abe9a7c73ce6b613d29c3cc27e82c3a770",
       "hooks": [
         "finalize"
       ],
@@ -235,7 +236,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/description",
@@ -245,8 +246,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-description"
       },
       "manifest_checksum": "sha256:48ddec02178d88f5b862e5a40b75b7c678e857ae70c71d1a159fb1065a8d8314",
-      "executable_path": ".goodcommit/plugins/bin/builtin-description",
-      "executable_checksum": "sha256:4efdacf7aab1ff9a5255480e59884d24bd8b0bad8fad306e31886bb2c787336c",
+      "executable_path": "gobin:builtin-description-48ddec02178d",
+      "executable_checksum": "sha256:ae0104e99a04cea9fc28d90297c074c67bda0814229c1f5339c88c3f9578d663",
       "hooks": [
         "collect"
       ],
@@ -274,7 +275,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/logo",
@@ -284,8 +285,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-logo"
       },
       "manifest_checksum": "sha256:af61b58d44701324a9b6f6108b590459e86a3cb4c5135ae1d3353c70364cab31",
-      "executable_path": ".goodcommit/plugins/bin/builtin-logo",
-      "executable_checksum": "sha256:f28d48fe7e3273fbd60fb21fe99d6c98971dc094a1f4739861b856dc941695c6",
+      "executable_path": "gobin:builtin-logo-af61b58d4470",
+      "executable_checksum": "sha256:5e3c0adde51cf0538220864aa5d91f35241c192bd6bc1413045bd5f737773d18",
       "hooks": [
         "collect"
       ],
@@ -304,7 +305,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/scopes",
@@ -314,8 +315,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-scopes"
       },
       "manifest_checksum": "sha256:5b566875df96f23b3e1386da07d5121e5d4d761caec6ad95c678f5335e619b30",
-      "executable_path": ".goodcommit/plugins/bin/builtin-scopes",
-      "executable_checksum": "sha256:ccacc4cdc8352545e4bbeb81f61e21c39d5ad6b4eb6cc77bafdf5b760614028c",
+      "executable_path": "gobin:builtin-scopes-5b566875df96",
+      "executable_checksum": "sha256:d2d7ac9480fadcac4db7f663e591886676848e4f2403730374a3aed4cef8041b",
       "hooks": [
         "collect",
         "enrich"
@@ -354,7 +355,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/signedoffby",
@@ -364,8 +365,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-signedoffby"
       },
       "manifest_checksum": "sha256:b02571782a435fb9295b135a2904004c831957878c2039fc835eb2c2a58d70ce",
-      "executable_path": ".goodcommit/plugins/bin/builtin-signedoffby",
-      "executable_checksum": "sha256:2979157a05df07f93e7291f80ed08ab366a1292f3ca066516e03f39508be4010",
+      "executable_path": "gobin:builtin-signedoffby-b02571782a43",
+      "executable_checksum": "sha256:5b1bac2c33fab8e273daa089b7e97aeb0a4e713f02ae5bebc2c0d78ce7b56c6d",
       "hooks": [
         "finalize"
       ],
@@ -384,7 +385,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/types",
@@ -394,8 +395,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-types"
       },
       "manifest_checksum": "sha256:ca08ca9e14f372135bef60555365b5c45554d87dd17e69c1f44b2a050a30eeb7",
-      "executable_path": ".goodcommit/plugins/bin/builtin-types",
-      "executable_checksum": "sha256:282561fecf5cdbdc8cadba87188549317c4e1e090f52c1f797fa584d1fa2d8b5",
+      "executable_path": "gobin:builtin-types-ca08ca9e14f3",
+      "executable_checksum": "sha256:d97c6451234472f01692e6c01b621a7836a9dd90876ecf3c33154cfb1081e8f1",
       "hooks": [
         "collect"
       ],
@@ -423,7 +424,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     },
     {
       "id": "builtin/why",
@@ -433,8 +434,8 @@
         "path": "github.com/rolasotelo/goodcommit/cmd/goodcommit-plugin-why"
       },
       "manifest_checksum": "sha256:8f1d5d5f15b6190a1eb15184bc07252d637c8081dcb0194652bb1f0210259112",
-      "executable_path": ".goodcommit/plugins/bin/builtin-why",
-      "executable_checksum": "sha256:e3c618f9572185b5681533d4f16be854b54c7b89a475dd7b173abdb781ed4c9f",
+      "executable_path": "gobin:builtin-why-8f1d5d5f15b6",
+      "executable_checksum": "sha256:61c4a83d3100de035955c2d90e83da44303d942c1d00f555f20bb43ec40b414c",
       "hooks": [
         "collect",
         "enrich"
@@ -468,7 +469,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-01T11:46:46Z"
+      "updated_at_utc": "2026-03-03T00:27:41Z"
     }
   ]
 }

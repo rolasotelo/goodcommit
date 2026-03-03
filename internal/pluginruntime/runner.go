@@ -104,7 +104,7 @@ func (r *Runner) RunPhase(ctx context.Context, hook HookPhase, draft *CommitDraf
 		request := newPluginRequest(hook, reqCtx, *draft, rp)
 		invocation, err := r.invokeWithPrompts(ctx, rp, request)
 		if err != nil {
-			if rp.FailureMode == FailOpen {
+			if rp.FailureMode == FailOpen && !isRequiredAnswerError(err) {
 				appendFailOpenInvocation(&results, rp, hook, request.RequestID, err)
 				continue
 			}
@@ -140,7 +140,7 @@ func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft 
 		req := newPluginRequest(hook, reqCtx, *draft, rp)
 		invocation, err := r.Invoke(ctx, rp, req)
 		if err != nil {
-			if rp.FailureMode == FailOpen {
+			if rp.FailureMode == FailOpen && !isRequiredAnswerError(err) {
 				appendFailOpenInvocation(&results, rp, hook, req.RequestID, err)
 				continue
 			}
@@ -151,7 +151,7 @@ func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft 
 			// Legacy prompt requests are handled with the normal mediation flow.
 			invocation, err = r.invokeWithPrompts(ctx, rp, req)
 			if err != nil {
-				if rp.FailureMode == FailOpen {
+				if rp.FailureMode == FailOpen && !isRequiredAnswerError(err) {
 					appendFailOpenInvocation(&results, rp, hook, req.RequestID, err)
 					continue
 				}
@@ -168,6 +168,9 @@ func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft 
 		}
 
 		if len(invocation.Response.UIRequests) == 0 {
+			if err := validateRequiredAnswersProvided(rp, req.Answers); err != nil {
+				return results, false, err
+			}
 			if invocation.Response.Mutations != nil {
 				ApplyMutations(draft, *invocation.Response.Mutations)
 			}
@@ -205,7 +208,7 @@ func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft 
 		}
 		invocation, err := r.invokeWithPrompts(ctx, item.Plugin, req)
 		if err != nil {
-			if item.Plugin.FailureMode == FailOpen {
+			if item.Plugin.FailureMode == FailOpen && !isRequiredAnswerError(err) {
 				appendFailOpenInvocation(&results, item.Plugin, hook, req.RequestID, err)
 				continue
 			}
@@ -246,6 +249,9 @@ func (r *Runner) invokeWithPrompts(ctx context.Context, rp RuntimePlugin, req Re
 		}
 
 		if len(invocation.Response.PromptRequests) == 0 && len(invocation.Response.UIRequests) == 0 {
+			if err := validateRequiredAnswersProvided(rp, req.Answers); err != nil {
+				return Invocation{}, err
+			}
 			return invocation, nil
 		}
 		if round == maxRounds {

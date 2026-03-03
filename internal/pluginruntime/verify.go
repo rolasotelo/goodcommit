@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // BuildLockfileFromResolved creates a reproducible lockfile from current plugin resolution.
@@ -67,9 +68,9 @@ func VerifyResolvedPlugins(resolved []ResolvedPlugin, lockPath string) error {
 			return fmt.Errorf("source mismatch for plugin %s", rp.Runtime.Manifest.ID)
 		}
 		if locked.ExecutablePath != "" {
-			execPath := locked.ExecutablePath
-			if !filepath.IsAbs(execPath) {
-				execPath = filepath.Join(filepath.Dir(lockPath), execPath)
+			execPath, err := resolveExecutablePath(filepath.Dir(lockPath), locked.ExecutablePath)
+			if err != nil {
+				return fmt.Errorf("resolve executable path for %s: %w", rp.Runtime.Manifest.ID, err)
 			}
 			if _, err := os.Stat(execPath); err != nil {
 				return fmt.Errorf("missing plugin executable for %s: %w", rp.Runtime.Manifest.ID, err)
@@ -99,9 +100,9 @@ func RuntimePluginsFromLock(resolved []ResolvedPlugin, lockPath string) ([]Runti
 			return nil, fmt.Errorf("plugin %s missing from lockfile", runtimePlugin.Manifest.ID)
 		}
 		if locked.ExecutablePath != "" {
-			execPath := locked.ExecutablePath
-			if !filepath.IsAbs(execPath) {
-				execPath = filepath.Join(lockDir, execPath)
+			execPath, err := resolveExecutablePath(lockDir, locked.ExecutablePath)
+			if err != nil {
+				return nil, fmt.Errorf("resolve executable path for %s: %w", runtimePlugin.Manifest.ID, err)
 			}
 			runtimePlugin.Manifest.Entrypoint.Command = execPath
 			runtimePlugin.Manifest.Entrypoint.Args = nil
@@ -118,4 +119,27 @@ func sameSource(a, b LockedSource) bool {
 		a.Ref == b.Ref &&
 		a.Path == b.Path &&
 		a.Checksum == b.Checksum
+}
+
+func resolveExecutablePath(lockDir, raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(trimmed, gobinLockPrefix) {
+		artifact := strings.TrimPrefix(trimmed, gobinLockPrefix)
+		artifact = filepath.Base(filepath.FromSlash(artifact))
+		if artifact == "." || artifact == string(filepath.Separator) || artifact == "" {
+			return "", fmt.Errorf("invalid gobin executable value %q", raw)
+		}
+		gobin, err := discoverGoBin()
+		if err != nil {
+			return "", fmt.Errorf("discover GOBIN: %w", err)
+		}
+		return filepath.Join(gobin, artifact), nil
+	}
+	if filepath.IsAbs(trimmed) {
+		return filepath.FromSlash(trimmed), nil
+	}
+	return filepath.Join(lockDir, filepath.FromSlash(trimmed)), nil
 }
