@@ -168,6 +168,9 @@ func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft 
 		}
 
 		if len(invocation.Response.UIRequests) == 0 {
+			if err := validateRequiredAnswersProvided(rp, req.Answers); err != nil {
+				return results, false, err
+			}
 			if invocation.Response.Mutations != nil {
 				ApplyMutations(draft, *invocation.Response.Mutations)
 			}

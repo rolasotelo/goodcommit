@@ -22,14 +22,8 @@ func gatherRequestContext() (plugins.RequestContext, error) {
 	if err != nil {
 		return plugins.RequestContext{}, err
 	}
-	branch, err := gitRequiredOutput("branch", "rev-parse", "--abbrev-ref", "HEAD")
-	if err != nil {
-		return plugins.RequestContext{}, err
-	}
-	head, err := gitRequiredOutput("head sha", "rev-parse", "HEAD")
-	if err != nil {
-		return plugins.RequestContext{}, err
-	}
+	branch := gitOptionalOutput("rev-parse", "--abbrev-ref", "HEAD")
+	head := gitOptionalOutput("rev-parse", "HEAD")
 	name, _ := gitOutput("config", "--get", "user.name")
 	email, _ := gitOutput("config", "--get", "user.email")
 
@@ -42,6 +36,14 @@ func gatherRequestContext() (plugins.RequestContext, error) {
 		GitUserEmail: strings.TrimSpace(email),
 		TimestampUTC: time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+func gitOptionalOutput(args ...string) string {
+	out, err := gitOutput(args...)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
 }
 
 func gitOutput(args ...string) (string, error) {
