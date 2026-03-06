@@ -62,7 +62,10 @@ func applyRequiredAnswerOverrides(manifest Manifest, requiredAnswers []string) (
 	return manifest, nil
 }
 
-func validateRequiredAnswersProvided(rp RuntimePlugin, answers map[string]interface{}) error {
+func validateRequiredAnswersProvided(hook HookPhase, rp RuntimePlugin, answers map[string]interface{}) error {
+	if hook != HookCollect {
+		return nil
+	}
 	if rp.Manifest.Contract == nil {
 		return nil
 	}

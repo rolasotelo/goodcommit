@@ -65,14 +65,14 @@ func TestValidateRequiredAnswersProvided(t *testing.T) {
 		},
 	}
 
-	if err := validateRequiredAnswersProvided(rp, map[string]interface{}{
+	if err := validateRequiredAnswersProvided(HookCollect, rp, map[string]interface{}{
 		"commit_body": "details",
 		"is_breaking": false,
 	}); err != nil {
 		t.Fatalf("validateRequiredAnswersProvided() unexpected error: %v", err)
 	}
 
-	err := validateRequiredAnswersProvided(rp, map[string]interface{}{
+	err := validateRequiredAnswersProvided(HookCollect, rp, map[string]interface{}{
 		"commit_body": "",
 		"is_breaking": true,
 	})
@@ -81,5 +81,22 @@ func TestValidateRequiredAnswersProvided(t *testing.T) {
 	}
 	if !isRequiredAnswerError(err) {
 		t.Fatalf("expected required-answer classification")
+	}
+}
+
+func TestValidateRequiredAnswersProvidedSkipsNonCollectHooks(t *testing.T) {
+	rp := RuntimePlugin{
+		Manifest: Manifest{
+			ID: "example/plugin",
+			Contract: &api.PluginContract{
+				Answers: []api.AIAnswerSpec{
+					{Key: "commit_scopes", Type: "[]string", Required: true},
+				},
+			},
+		},
+	}
+
+	if err := validateRequiredAnswersProvided(HookEnrich, rp, nil); err != nil {
+		t.Fatalf("validateRequiredAnswersProvided() should skip non-collect hooks: %v", err)
 	}
 }

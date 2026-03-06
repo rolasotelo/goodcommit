@@ -168,7 +168,7 @@ func (r *Runner) runGroupedUIPlugins(ctx context.Context, hook HookPhase, draft 
 		}
 
 		if len(invocation.Response.UIRequests) == 0 {
-			if err := validateRequiredAnswersProvided(rp, req.Answers); err != nil {
+			if err := validateRequiredAnswersProvided(hook, rp, req.Answers); err != nil {
 				return results, false, err
 			}
 			if invocation.Response.Mutations != nil {
@@ -249,7 +249,7 @@ func (r *Runner) invokeWithPrompts(ctx context.Context, rp RuntimePlugin, req Re
 		}
 
 		if len(invocation.Response.PromptRequests) == 0 && len(invocation.Response.UIRequests) == 0 {
-			if err := validateRequiredAnswersProvided(rp, req.Answers); err != nil {
+			if err := validateRequiredAnswersProvided(req.Hook, rp, req.Answers); err != nil {
 				return Invocation{}, err
 			}
 			return invocation, nil
