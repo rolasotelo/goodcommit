@@ -309,10 +309,11 @@ func pathForLockfile(lockDir, binDir, artifactPath string) (string, error) {
 }
 
 func resolveDirectExecutablePath(lockDir string, rp ResolvedPlugin) (string, error) {
-	candidates := []string{rp.Runtime.Manifest.Entrypoint.Command}
+	candidates := []string{}
 	if strings.TrimSpace(rp.Source.Path) != "" {
 		candidates = append(candidates, rp.Source.Path)
 	}
+	candidates = append(candidates, rp.Runtime.Manifest.Entrypoint.Command)
 
 	seen := map[string]bool{}
 	var firstErr error

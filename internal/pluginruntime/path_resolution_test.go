@@ -190,6 +190,84 @@ func TestVerifyResolvedPluginsRejectsTamperedDirectExecutablePathPlugins(t *test
 	}
 }
 
+func TestInterpreterStylePathPluginsPinScriptAndPreserveCommand(t *testing.T) {
+	lockDir := t.TempDir()
+	lockPath := filepath.Join(lockDir, "goodcommit.plugins.lock")
+	pluginPath := filepath.Join(lockDir, "plugins", "my-plugin.py")
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(pluginPath, []byte("print('ok')\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	resolved := []ResolvedPlugin{{
+		Runtime: RuntimePlugin{
+			Manifest: Manifest{
+				APIVersion: "goodcommit.io/v1",
+				Kind:       "Plugin",
+				ID:         "test/interpreter-path",
+				Version:    "1.0.0",
+				Entrypoint: EntryPoint{
+					Type:    "exec",
+					Command: "python3",
+					Args:    []string{"./plugins/my-plugin.py", "--serve"},
+				},
+				Hooks:            []HookPhase{HookCollect},
+				ProtocolVersions: []string{ProtocolVersionV1},
+			},
+		},
+		Source: LockedSource{
+			Type: "path",
+			Path: "./plugins/my-plugin.py",
+		},
+		ManifestSHA: "sha256:fedcba9876543210",
+	}}
+
+	lf, err := BuildLockfileWithArtifacts(resolved, lockPath, "project")
+	if err != nil {
+		t.Fatalf("BuildLockfileWithArtifacts() error = %v", err)
+	}
+	if len(lf.Plugins) != 1 {
+		t.Fatalf("lockfile plugins = %d, want 1", len(lf.Plugins))
+	}
+	lockedExecPath, err := resolveExecutablePath(lockDir, lf.Plugins[0].ExecutablePath)
+	if err != nil {
+		t.Fatalf("resolveExecutablePath() error = %v", err)
+	}
+	if lockedExecPath != pluginPath {
+		t.Fatalf("locked executable path = %q, want %q", lockedExecPath, pluginPath)
+	}
+	if err := WriteLockfile(lockPath, lf); err != nil {
+		t.Fatalf("WriteLockfile() error = %v", err)
+	}
+	if err := VerifyResolvedPlugins(resolved, lockPath); err != nil {
+		t.Fatalf("VerifyResolvedPlugins() error = %v", err)
+	}
+
+	runtimePlugins, err := RuntimePluginsFromLock(resolved, lockPath)
+	if err != nil {
+		t.Fatalf("RuntimePluginsFromLock() error = %v", err)
+	}
+	if got := runtimePlugins[0].Manifest.Entrypoint.Command; got != "python3" {
+		t.Fatalf("runtime command = %q, want %q", got, "python3")
+	}
+	if got := runtimePlugins[0].Manifest.Entrypoint.Args; len(got) != 2 || got[0] != "./plugins/my-plugin.py" || got[1] != "--serve" {
+		t.Fatalf("runtime args = %#v, want preserved interpreter args", got)
+	}
+
+	if err := os.WriteFile(pluginPath, []byte("print('tampered')\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	err = VerifyResolvedPlugins(resolved, lockPath)
+	if err == nil {
+		t.Fatalf("expected VerifyResolvedPlugins() error")
+	}
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestVerifyResolvedPluginsRejectsUnpinnedDirectExecutablePathPlugins(t *testing.T) {
 	lockDir := t.TempDir()
 	lockPath := filepath.Join(lockDir, "goodcommit.plugins.lock")

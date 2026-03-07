@@ -110,7 +110,9 @@ func RuntimePluginsFromLock(resolved []ResolvedPlugin, lockPath string) ([]Runti
 			if err != nil {
 				return nil, fmt.Errorf("resolve executable path for %s: %w", runtimePlugin.Manifest.ID, err)
 			}
-			runtimePlugin.Manifest.Entrypoint.Command = execPath
+			if shouldRewriteEntrypointCommand(lockDir, rp, execPath) {
+				runtimePlugin.Manifest.Entrypoint.Command = execPath
+			}
 			if buildTarget(rp) != "" {
 				runtimePlugin.Manifest.Entrypoint.Args = nil
 			}
@@ -119,6 +121,18 @@ func RuntimePluginsFromLock(resolved []ResolvedPlugin, lockPath string) ([]Runti
 	}
 
 	return out, nil
+}
+
+func shouldRewriteEntrypointCommand(lockDir string, rp ResolvedPlugin, lockedExecPath string) bool {
+	if buildTarget(rp) != "" {
+		return true
+	}
+
+	commandPath, err := resolveExecutableCandidate(lockDir, strings.TrimSpace(rp.Runtime.Manifest.Entrypoint.Command))
+	if err != nil {
+		return false
+	}
+	return samePath(commandPath, lockedExecPath)
 }
 
 func sameSource(a, b LockedSource) bool {
