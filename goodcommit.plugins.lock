@@ -10,7 +10,7 @@
       },
       "manifest_checksum": "sha256:3b3a424abac399f7181c8bdd6b5320836c1f07a990c938bf6ff699df2aba3fe8",
       "executable_path": "gobin:builtin-body-3b3a424abac3",
-      "executable_checksum": "sha256:2aa55bc258d3b1b2ece3c5780b980e5e28c4990a8e5bb9f0780b7b12fc12cfde",
+      "executable_checksum": "sha256:d7df011dfcf970c6da118597340b485fe6cd295705ce1d39ef2db49f2dcdac20",
       "hooks": [
         "collect"
       ],
@@ -32,7 +32,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/breaking",
@@ -43,7 +43,7 @@
       },
       "manifest_checksum": "sha256:ccb7ee6066475ce45a51e7a04eb3686badd3a5ea6fdd209d9110db998209a6f3",
       "executable_path": "gobin:builtin-breaking-ccb7ee606647",
-      "executable_checksum": "sha256:309a63559860e8f1367a6c22745b9d153583b1a66b09da02eb4a578d7f3228aa",
+      "executable_checksum": "sha256:5e3dd4404f502cc61b2627028ab5204949ee87bc46d97c39cf23143ed6f7f822",
       "hooks": [
         "collect"
       ],
@@ -80,7 +80,7 @@
       "ai_auto_answers": {
         "is_breaking": false
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/breakingmsg",
@@ -91,7 +91,7 @@
       },
       "manifest_checksum": "sha256:21421a65e8a988a2625ab1e198e24f5f80b332d000d422af3f6121946a4882c2",
       "executable_path": "gobin:builtin-breakingmsg-21421a65e8a9",
-      "executable_checksum": "sha256:dd6bac207629ec2e40df6f9baed163e340a4b3f7195db071da102780a807e4ea",
+      "executable_checksum": "sha256:b5ad0e2893fcb8cf3a4fb144a275324fdb99f9faa29acfe0b7a335b553d2a08f",
       "hooks": [
         "collect",
         "enrich"
@@ -126,7 +126,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/coauthors",
@@ -137,7 +137,7 @@
       },
       "manifest_checksum": "sha256:ab995a805c5813846bdbec444cd02ccab322977dcb8435e39cebe34948150a5c",
       "executable_path": "gobin:builtin-coauthors-ab995a805c58",
-      "executable_checksum": "sha256:5f6cf5c9f52c21d96d7341b61c5f8cc8694c78cd8a5efb3cadc27862069e4b92",
+      "executable_checksum": "sha256:620aa34012630379cb378ca38c5bed9381d72c054eb8123f5e7eab3b3ce929ae",
       "hooks": [
         "collect",
         "finalize"
@@ -192,7 +192,7 @@
       "ai_auto_answers": {
         "coauthors_selected": []
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/conventional-title",
@@ -203,7 +203,7 @@
       },
       "manifest_checksum": "sha256:daff04b494a2d6baddec4df923c2c0826fe002314364b884772897dd053069f0",
       "executable_path": "gobin:builtin-conventional-title-daff04b494a2",
-      "executable_checksum": "sha256:a4e681ad28bd11328ac86cec428713abe9a7c73ce6b613d29c3cc27e82c3a770",
+      "executable_checksum": "sha256:4745c07fac9ee5cd2edbc1a04daae7a22227356b9a89f7ce20eb48ea78633a3c",
       "hooks": [
         "finalize"
       ],
@@ -236,7 +236,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/description",
@@ -247,7 +247,7 @@
       },
       "manifest_checksum": "sha256:48ddec02178d88f5b862e5a40b75b7c678e857ae70c71d1a159fb1065a8d8314",
       "executable_path": "gobin:builtin-description-48ddec02178d",
-      "executable_checksum": "sha256:ae0104e99a04cea9fc28d90297c074c67bda0814229c1f5339c88c3f9578d663",
+      "executable_checksum": "sha256:49cc39a6168e9505e9c3c972c3b4c98b28d1e244f3bab28e05897364e2f0d5ab",
       "hooks": [
         "collect"
       ],
@@ -275,7 +275,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/logo",
@@ -286,7 +286,7 @@
       },
       "manifest_checksum": "sha256:af61b58d44701324a9b6f6108b590459e86a3cb4c5135ae1d3353c70364cab31",
       "executable_path": "gobin:builtin-logo-af61b58d4470",
-      "executable_checksum": "sha256:5e3c0adde51cf0538220864aa5d91f35241c192bd6bc1413045bd5f737773d18",
+      "executable_checksum": "sha256:050c56752d3ebbcd8f6392df3be7087858ed948e321b71c6295e7ce9343e851c",
       "hooks": [
         "collect"
       ],
@@ -305,7 +305,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/scopes",
@@ -316,7 +316,7 @@
       },
       "manifest_checksum": "sha256:5b566875df96f23b3e1386da07d5121e5d4d761caec6ad95c678f5335e619b30",
       "executable_path": "gobin:builtin-scopes-5b566875df96",
-      "executable_checksum": "sha256:d2d7ac9480fadcac4db7f663e591886676848e4f2403730374a3aed4cef8041b",
+      "executable_checksum": "sha256:6a249efb63442040a7a689db1466a6748fcffad76401da3e5ea4736ad01b4b41",
       "hooks": [
         "collect",
         "enrich"
@@ -355,7 +355,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/signedoffby",
@@ -366,7 +366,7 @@
       },
       "manifest_checksum": "sha256:b02571782a435fb9295b135a2904004c831957878c2039fc835eb2c2a58d70ce",
       "executable_path": "gobin:builtin-signedoffby-b02571782a43",
-      "executable_checksum": "sha256:5b1bac2c33fab8e273daa089b7e97aeb0a4e713f02ae5bebc2c0d78ce7b56c6d",
+      "executable_checksum": "sha256:78f5c6c094881330d2aad6eed168faa6acdde1ed505cc42097437fd1faf6dbab",
       "hooks": [
         "finalize"
       ],
@@ -385,7 +385,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/types",
@@ -396,7 +396,7 @@
       },
       "manifest_checksum": "sha256:ca08ca9e14f372135bef60555365b5c45554d87dd17e69c1f44b2a050a30eeb7",
       "executable_path": "gobin:builtin-types-ca08ca9e14f3",
-      "executable_checksum": "sha256:d97c6451234472f01692e6c01b621a7836a9dd90876ecf3c33154cfb1081e8f1",
+      "executable_checksum": "sha256:efeec13591ff2e1c2f4d84d113f76d418c9b476e4173e457c731cf2bec98a0b7",
       "hooks": [
         "collect"
       ],
@@ -424,7 +424,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     },
     {
       "id": "builtin/why",
@@ -435,7 +435,7 @@
       },
       "manifest_checksum": "sha256:8f1d5d5f15b6190a1eb15184bc07252d637c8081dcb0194652bb1f0210259112",
       "executable_path": "gobin:builtin-why-8f1d5d5f15b6",
-      "executable_checksum": "sha256:61c4a83d3100de035955c2d90e83da44303d942c1d00f555f20bb43ec40b414c",
+      "executable_checksum": "sha256:c8eb125432037931bff09fbf4673354920aeefc9c6ff964108f00455b595d2da",
       "hooks": [
         "collect",
         "enrich"
@@ -469,7 +469,7 @@
           }
         ]
       },
-      "updated_at_utc": "2026-03-03T00:27:41Z"
+      "updated_at_utc": "2026-03-07T00:41:52Z"
     }
   ]
 }

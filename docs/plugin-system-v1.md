@@ -101,6 +101,7 @@ Core should enforce:
 - Versioned protocol: `protocol_version` (example: `"1.0"`).
 - Plugin advertises supported versions in handshake.
 - Core chooses highest mutually supported version.
+- Current runtime supports protocol `1.0` and rejects manifests that do not list it.
 - Unknown fields are ignored (forward compatibility).
 
 ## Security Model
@@ -120,6 +121,8 @@ Core policy:
 - Show permission prompts for untrusted plugins.
 - Persist trust decisions.
 - Store plugin source checksums in a lock file.
+- Current implementation gates only manifest-declared permissions; it does not OS-sandbox plugin subprocesses.
+- Users should treat plugins as trusted code until stronger isolation is implemented.
 
 ## Distribution and Discovery
 

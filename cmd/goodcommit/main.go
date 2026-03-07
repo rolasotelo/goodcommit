@@ -17,10 +17,10 @@ Flags:
 	--plugins-config       Path to a plugin configuration file
 	--plugins-lockfile     Path to a plugin lockfile (default: goodcommit.plugins.lock)
 	--plugins-skip-verify  Skip plugin lockfile verification
-	--allow-plugin-network Allow plugins that request network permission
-	--allow-plugin-git-write Allow plugins that request git_write permission
-	--allow-plugin-filesystem-write Allow plugins that request filesystem_write permission
-	--allow-plugin-secrets Allow plugins that request secrets permission
+	--allow-plugin-network Allow plugins that declare network permission (policy only; no OS sandbox)
+	--allow-plugin-git-write Allow plugins that declare git_write permission (policy only; no OS sandbox)
+	--allow-plugin-filesystem-write Allow plugins that declare filesystem_write permission (policy only; no OS sandbox)
+	--allow-plugin-secrets Allow plugins that declare secrets permission (policy only; no OS sandbox)
 	--plugin-answer        Provide answer for plugin prompts/forms as key=value (repeatable)
 	--retry                Retry commit with the last saved commit message
 	--edit                 Edit the last saved commit message
@@ -98,10 +98,10 @@ func main() {
 	flag.StringVar(&pluginsLockfilePath, "plugins-lockfile", pluginsLockfilePath, "Path to a plugin lockfile")
 
 	pluginsSkipVerify := flag.Bool("plugins-skip-verify", false, "Skip plugin lockfile verification")
-	allowPluginNetwork := flag.Bool("allow-plugin-network", false, "Allow plugins that request network permission")
-	allowPluginGitWrite := flag.Bool("allow-plugin-git-write", false, "Allow plugins that request git_write permission")
-	allowPluginFilesystemWrite := flag.Bool("allow-plugin-filesystem-write", false, "Allow plugins that request filesystem_write permission")
-	allowPluginSecrets := flag.Bool("allow-plugin-secrets", false, "Allow plugins that request secrets permission")
+	allowPluginNetwork := flag.Bool("allow-plugin-network", false, "Allow plugins that declare network permission (policy only; no OS sandbox)")
+	allowPluginGitWrite := flag.Bool("allow-plugin-git-write", false, "Allow plugins that declare git_write permission (policy only; no OS sandbox)")
+	allowPluginFilesystemWrite := flag.Bool("allow-plugin-filesystem-write", false, "Allow plugins that declare filesystem_write permission (policy only; no OS sandbox)")
+	allowPluginSecrets := flag.Bool("allow-plugin-secrets", false, "Allow plugins that declare secrets permission (policy only; no OS sandbox)")
 	messageOverride := flag.String("message", "", "Use an initial commit message before plugin phases")
 	var pluginAnswers pluginAnswerFlag
 	flag.Var(&pluginAnswers, "plugin-answer", "Provide answer for plugin prompts/forms as key=value (repeatable)")
@@ -217,6 +217,9 @@ func main() {
 	runner.AllowPluginGitWrite = *allowPluginGitWrite
 	runner.AllowFilesystemWrite = *allowPluginFilesystemWrite
 	runner.AllowPluginSecrets = *allowPluginSecrets
+	if *allowPluginNetwork || *allowPluginGitWrite || *allowPluginFilesystemWrite || *allowPluginSecrets {
+		fmt.Fprintln(os.Stderr, "Warning: goodcommit permission flags gate manifest declarations only; plugin processes are not OS-sandboxed. Run only trusted plugins.")
+	}
 
 	invocations, err := runPluginPhases(context.Background(), runner, runtimePlugins, reqCtx, &draft, []plugins.HookPhase{
 		plugins.HookCollect,

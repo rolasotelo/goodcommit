@@ -37,8 +37,8 @@ func ParseManifest(raw []byte) (Manifest, error) {
 	if err := validateManifest(m); err != nil {
 		return Manifest{}, err
 	}
-	if len(m.ProtocolVersions) == 0 {
-		m.ProtocolVersions = []string{ProtocolVersionV1}
+	if err := normalizeAndValidateProtocol(&m); err != nil {
+		return Manifest{}, err
 	}
 	return m, nil
 }
@@ -50,4 +50,14 @@ func SupportsProtocol(m Manifest, protocol string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeAndValidateProtocol(m *Manifest) error {
+	if len(m.ProtocolVersions) == 0 {
+		m.ProtocolVersions = []string{ProtocolVersionV1}
+	}
+	if SupportsProtocol(*m, ProtocolVersionV1) {
+		return nil
+	}
+	return fmt.Errorf("manifest %s does not support protocol version %s", m.ID, ProtocolVersionV1)
 }

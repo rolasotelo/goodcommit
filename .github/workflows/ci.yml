@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GOBIN: ${{ runner.temp }}/gobin
+      GOODCOMMIT_CI_LOCKFILE: ${{ runner.temp }}/goodcommit.plugins.lock
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Generate plugin lockfile
+        run: >
+          go run ./cmd/goodcommit plugin lock
+          --plugins-config ./configs/goodcommit.plugins.json
+          --plugins-lockfile "${GOODCOMMIT_CI_LOCKFILE}"
+
+      - name: Verify generated plugin lockfile
+        run: >
+          go run ./cmd/goodcommit plugin verify
+          --plugins-config ./configs/goodcommit.plugins.json
+          --plugins-lockfile "${GOODCOMMIT_CI_LOCKFILE}"

@@ -106,6 +106,10 @@ goodcommit plugin context \
 
 Built-in plugins can omit explicit `manifest`/`source` in config; runtime resolves them from embedded built-in definitions.
 
+Permission note:
+- The `--allow-plugin-*` flags approve manifest-declared access categories, but they do not OS-sandbox plugin subprocesses.
+- Treat plugins as trusted code unless/until stronger sandboxing lands.
+
 You can force specific plugin answer keys to be mandatory via `required_answers` on that plugin config entry. Example:
 
 ```json

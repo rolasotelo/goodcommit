@@ -58,10 +58,14 @@ func BuildLockfileWithArtifacts(resolved []ResolvedPlugin, lockPath, binDirOverr
 
 func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, string, error) {
 	target := buildTarget(rp)
-	if target == "" {
-		return "", "", nil
+	if target != "" {
+		return buildExecutableArtifact(lockDir, binDir, rp, target)
 	}
 
+	return lockDirectExecutable(lockDir, rp)
+}
+
+func buildExecutableArtifact(lockDir, binDir string, rp ResolvedPlugin, target string) (string, string, error) {
 	artifactName := sanitizePluginID(rp.Runtime.Manifest.ID)
 	if suffix := artifactNameSuffix(rp); suffix != "" {
 		artifactName += "-" + suffix
@@ -90,8 +94,32 @@ func installExecutable(lockDir, binDir string, rp ResolvedPlugin) (string, strin
 	return storedPath, sum, nil
 }
 
+func lockDirectExecutable(lockDir string, rp ResolvedPlugin) (string, string, error) {
+	execPath, err := resolveDirectExecutablePath(lockDir, rp)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
+	}
+	if execPath == "" {
+		if requiresExecutablePin(rp) {
+			return "", "", fmt.Errorf("plugin %s uses source.type=path but no lockable executable was found", rp.Runtime.Manifest.ID)
+		}
+		return "", "", nil
+	}
+
+	sum, err := FileSHA256(execPath)
+	if err != nil {
+		return "", "", fmt.Errorf("checksum plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
+	}
+	storedPath, err := pathForLockfile(lockDir, filepath.Dir(execPath), execPath)
+	if err != nil {
+		return "", "", fmt.Errorf("path for plugin executable %s: %w", rp.Runtime.Manifest.ID, err)
+	}
+	return storedPath, sum, nil
+}
+
 func buildPluginArtifact(artifactPath, target, moduleRef string) error {
-	stderr, err := runGoBuild("", artifactPath, target)
+	buildDir, buildTarget := prepareGoBuildInvocation(target)
+	stderr, err := runGoBuild(buildDir, artifactPath, buildTarget)
 	if err == nil {
 		return nil
 	}
@@ -103,6 +131,61 @@ func buildPluginArtifact(artifactPath, target, moduleRef string) error {
 		return fmt.Errorf("%w stderr=%s (fallback stderr=%s)", err, strings.TrimSpace(stderr), strings.TrimSpace(tempStderr))
 	}
 	return fmt.Errorf("%w stderr=%s", err, strings.TrimSpace(stderr))
+}
+
+func prepareGoBuildInvocation(target string) (string, string) {
+	localTarget, ok := resolveLocalBuildTarget(target)
+	if !ok {
+		return "", target
+	}
+
+	buildDir := filepath.Dir(localTarget)
+	if moduleDir := findGoModuleDir(localTarget); moduleDir != "" {
+		buildDir = moduleDir
+	}
+
+	relTarget, err := filepath.Rel(buildDir, localTarget)
+	if err != nil {
+		return buildDir, localTarget
+	}
+	if relTarget == "." {
+		return buildDir, "."
+	}
+	if !strings.HasPrefix(relTarget, ".") {
+		relTarget = "." + string(filepath.Separator) + relTarget
+	}
+	return buildDir, relTarget
+}
+
+func resolveLocalBuildTarget(target string) (string, bool) {
+	trimmed := strings.TrimSpace(target)
+	if trimmed == "" || isModuleImportTarget(trimmed) {
+		return "", false
+	}
+	if filepath.IsAbs(trimmed) {
+		return filepath.Clean(trimmed), true
+	}
+	if strings.HasPrefix(trimmed, ".") || strings.HasPrefix(trimmed, "..") || strings.ContainsAny(trimmed, `/\`) {
+		absTarget, err := filepath.Abs(trimmed)
+		if err == nil {
+			return absTarget, true
+		}
+	}
+	return "", false
+}
+
+func findGoModuleDir(target string) string {
+	dir := target
+	for {
+		if info, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil && !info.IsDir() {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }
 
 func runGoBuild(dir, artifactPath, target string) (string, error) {
@@ -223,6 +306,70 @@ func pathForLockfile(lockDir, binDir, artifactPath string) (string, error) {
 	}
 
 	return filepath.ToSlash(artifactPath), nil
+}
+
+func resolveDirectExecutablePath(lockDir string, rp ResolvedPlugin) (string, error) {
+	candidates := []string{}
+	if strings.TrimSpace(rp.Source.Path) != "" {
+		candidates = append(candidates, rp.Source.Path)
+	}
+	candidates = append(candidates, rp.Runtime.Manifest.Entrypoint.Command)
+
+	seen := map[string]bool{}
+	var firstErr error
+	for _, raw := range candidates {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+
+		resolved, err := resolveExecutableCandidate(lockDir, trimmed)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		info, err := os.Stat(resolved)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		if info.IsDir() {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s is a directory, not an executable", resolved)
+			}
+			continue
+		}
+		return resolved, nil
+	}
+
+	return "", firstErr
+}
+
+func resolveExecutableCandidate(lockDir, raw string) (string, error) {
+	if raw == "" {
+		return "", nil
+	}
+	if filepath.IsAbs(raw) {
+		return raw, nil
+	}
+	if strings.ContainsAny(raw, `/\`) {
+		return filepath.Abs(filepath.Join(lockDir, filepath.FromSlash(raw)))
+	}
+
+	resolved, err := exec.LookPath(raw)
+	if err != nil {
+		return "", fmt.Errorf("locate %q on PATH: %w", raw, err)
+	}
+	return resolved, nil
+}
+
+func requiresExecutablePin(rp ResolvedPlugin) bool {
+	return rp.Source.Type == "path" && buildTarget(rp) == ""
 }
 
 func buildTarget(rp ResolvedPlugin) string {
