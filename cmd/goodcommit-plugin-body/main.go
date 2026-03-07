@@ -53,8 +53,7 @@ func normalizeBody(body string) string {
 	if body == "" {
 		return ""
 	}
-	first := strings.ToUpper(body[:1])
-	body = first + body[1:]
+	body = pluginutil.UppercaseFirstRune(body)
 	if !strings.HasSuffix(body, ".") && !strings.HasSuffix(body, "!") && !strings.HasSuffix(body, "?") {
 		body += "."
 	}

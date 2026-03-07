@@ -37,7 +37,7 @@ func run() error {
 			pluginutil.AddError(&resp, "DESCRIPTION_REQUIRED", "description is required")
 			return pluginutil.WriteResponse(resp)
 		}
-		desc = strings.ToLower(desc[:1]) + desc[1:]
+		desc = pluginutil.LowercaseFirstRune(desc)
 		resp.Mutations = &plugins.Mutations{MetadataPatch: map[string]interface{}{"gc.description": desc}}
 		pluginutil.AddInfo(&resp, "DESCRIPTION_SET", "commit description captured")
 		return pluginutil.WriteResponse(resp)

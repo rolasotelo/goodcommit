@@ -316,16 +316,20 @@ func (r *Runner) handlePluginUIRequests(pluginID string, resp Response) (map[str
 
 // Invoke executes a single plugin process.
 func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Invocation, error) {
-	if err := validateManifest(rp.Manifest); err != nil {
-		return Invocation{}, fmt.Errorf("manifest validation failed for %s: %w", rp.Manifest.ID, err)
+	manifest := rp.Manifest
+	if err := normalizeAndValidateProtocol(&manifest); err != nil {
+		return Invocation{}, fmt.Errorf("manifest protocol validation failed for %s: %w", rp.Manifest.ID, err)
 	}
-	if !supportsHook(rp.Manifest.Hooks, req.Hook) {
-		return Invocation{}, fmt.Errorf("plugin %s does not support hook %s", rp.Manifest.ID, req.Hook)
+	if err := validateManifest(manifest); err != nil {
+		return Invocation{}, fmt.Errorf("manifest validation failed for %s: %w", manifest.ID, err)
+	}
+	if !supportsHook(manifest.Hooks, req.Hook) {
+		return Invocation{}, fmt.Errorf("plugin %s does not support hook %s", manifest.ID, req.Hook)
 	}
 	if err := validateRequest(req); err != nil {
 		return Invocation{}, fmt.Errorf("request validation failed: %w", err)
 	}
-	if err := r.checkPermissions(rp.Manifest.ID, rp.Manifest.Permissions); err != nil {
+	if err := r.checkPermissions(manifest.ID, manifest.Permissions); err != nil {
 		return Invocation{}, err
 	}
 
@@ -344,10 +348,10 @@ func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Inv
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, rp.Manifest.Entrypoint.Command, rp.Manifest.Entrypoint.Args...)
+	cmd := exec.CommandContext(ctx, manifest.Entrypoint.Command, manifest.Entrypoint.Args...)
 	cmd.Stdin = bytes.NewReader(rawReq)
 	cmd.Dir = req.Context.RepoRoot
-	cmd.Env = buildPluginEnv(rp.Manifest.Permissions.Secrets, rp.Manifest.Entrypoint.Env)
+	cmd.Env = buildPluginEnv(manifest.Permissions.Secrets, manifest.Entrypoint.Env)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -358,9 +362,9 @@ func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Inv
 	duration := time.Since(start)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return Invocation{}, fmt.Errorf("plugin %s timed out after %s", rp.Manifest.ID, timeout)
+			return Invocation{}, fmt.Errorf("plugin %s timed out after %s", manifest.ID, timeout)
 		}
-		return Invocation{}, fmt.Errorf("plugin %s failed: %w stderr=%s", rp.Manifest.ID, err, stderr.String())
+		return Invocation{}, fmt.Errorf("plugin %s failed: %w stderr=%s", manifest.ID, err, stderr.String())
 	}
 
 	maxOut := r.MaxOutputBytes
@@ -368,19 +372,19 @@ func (r *Runner) Invoke(ctx context.Context, rp RuntimePlugin, req Request) (Inv
 		maxOut = defaultMaxOutputSize
 	}
 	if stdout.Len() > maxOut {
-		return Invocation{}, fmt.Errorf("plugin %s output exceeded max size %d", rp.Manifest.ID, maxOut)
+		return Invocation{}, fmt.Errorf("plugin %s output exceeded max size %d", manifest.ID, maxOut)
 	}
 
 	var resp Response
 	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
-		return Invocation{}, fmt.Errorf("invalid plugin response from %s: %w stderr=%s", rp.Manifest.ID, err, stderr.String())
+		return Invocation{}, fmt.Errorf("invalid plugin response from %s: %w stderr=%s", manifest.ID, err, stderr.String())
 	}
 	if err := validateResponse(resp, req); err != nil {
-		return Invocation{}, fmt.Errorf("response validation failed for %s: %w", rp.Manifest.ID, err)
+		return Invocation{}, fmt.Errorf("response validation failed for %s: %w", manifest.ID, err)
 	}
 
 	return Invocation{
-		PluginID: rp.Manifest.ID,
+		PluginID: manifest.ID,
 		Hook:     req.Hook,
 		Response: resp,
 		Stderr:   stderr.String(),

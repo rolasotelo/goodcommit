@@ -74,7 +74,7 @@ func normalizeSentence(s string) string {
 	if s == "" {
 		return ""
 	}
-	s = strings.ToUpper(s[:1]) + s[1:]
+	s = pluginutil.UppercaseFirstRune(s)
 	return s + "."
 }
 

@@ -67,6 +67,9 @@ func VerifyResolvedPlugins(resolved []ResolvedPlugin, lockPath string) error {
 		if !sameSource(locked.Source, rp.Source) {
 			return fmt.Errorf("source mismatch for plugin %s", rp.Runtime.Manifest.ID)
 		}
+		if locked.ExecutablePath == "" && requiresExecutablePin(rp) {
+			return fmt.Errorf("lockfile missing executable path for plugin %s; re-run plugin lock", rp.Runtime.Manifest.ID)
+		}
 		if locked.ExecutablePath != "" {
 			execPath, err := resolveExecutablePath(filepath.Dir(lockPath), locked.ExecutablePath)
 			if err != nil {
@@ -99,13 +102,18 @@ func RuntimePluginsFromLock(resolved []ResolvedPlugin, lockPath string) ([]Runti
 		if !ok {
 			return nil, fmt.Errorf("plugin %s missing from lockfile", runtimePlugin.Manifest.ID)
 		}
+		if locked.ExecutablePath == "" && requiresExecutablePin(rp) {
+			return nil, fmt.Errorf("lockfile missing executable path for plugin %s; re-run plugin lock", runtimePlugin.Manifest.ID)
+		}
 		if locked.ExecutablePath != "" {
 			execPath, err := resolveExecutablePath(lockDir, locked.ExecutablePath)
 			if err != nil {
 				return nil, fmt.Errorf("resolve executable path for %s: %w", runtimePlugin.Manifest.ID, err)
 			}
 			runtimePlugin.Manifest.Entrypoint.Command = execPath
-			runtimePlugin.Manifest.Entrypoint.Args = nil
+			if buildTarget(rp) != "" {
+				runtimePlugin.Manifest.Entrypoint.Args = nil
+			}
 		}
 		out = append(out, runtimePlugin)
 	}

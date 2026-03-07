@@ -34,6 +34,7 @@ The lockfile stores resolved plugin sources and checksums for reproducibility.
 ## Workflow
 
 1. Install/resolve plugin source (`path`, `git`, or `builtin`) and build executable artifacts into `.goodcommit/plugins/bin`.
+   Direct executable `path` plugins are pinned by checksum even when they are not rebuilt.
 2. Read plugin manifest and compute checksum.
 3. Upsert lockfile entry.
 4. At runtime, verify source, manifest, and executable checksums before execution.
